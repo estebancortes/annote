@@ -1,0 +1,14 @@
+services:
+  annote:
+    build: .
+    ports:
+      - "8787:3000"
+    environment:
+      ANNOTE_ADMIN_KEY: ${ANNOTE_ADMIN_KEY:?Set ANNOTE_ADMIN_KEY before starting Annote}
+      ANNOTE_DATABASE_PATH: /data/annote.db
+    volumes:
+      - annote-data:/data
+    restart: unless-stopped
+
+volumes:
+  annote-data:

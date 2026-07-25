@@ -1,0 +1,7 @@
+node_modules
+dist
+data/annote.json
+data/annote.db
+data/annote.db-shm
+data/annote.db-wal
+.env
