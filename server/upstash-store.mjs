@@ -21,7 +21,12 @@ function parse(value) {
 }
 
 export function createUpstashStore() {
-  const redis = Redis.fromEnv();
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  if (!url || !token) {
+    throw new Error("Upstash Redis is not configured. Connect the Upstash integration and ensure its Redis variables are available in the Production environment.");
+  }
+  const redis = new Redis({ url, token });
 
   async function annotationIds(projectId, newestFirst) {
     return redis.zrange(annotationIndexKey(projectId), 0, -1, newestFirst ? { rev: true } : undefined);
