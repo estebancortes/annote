@@ -1,4 +1,4 @@
-import { Check, Crosshair, LockKeyhole, MessageSquare, Send, X, createElement } from "lucide";
+import { Check, Crosshair, Highlighter, LockKeyhole, MessageSquare, Send, X, createElement } from "lucide";
 import type { Annotation } from "./types";
 
 export interface AnnoteOptions {
@@ -13,6 +13,8 @@ interface SelectedTarget {
   label: string;
   text: string;
   position: { x: number; y: number };
+  kind: "element" | "text";
+  quote?: string;
 }
 
 function escapeSelector(value: string) {
@@ -46,7 +48,41 @@ function targetFor(element: Element): SelectedTarget {
     label,
     text: (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 180),
     position: { x: Math.round(rect.left + window.scrollX), y: Math.round(rect.top + window.scrollY) },
+    kind: "element",
   };
+}
+
+function textRangeFor(root: Element, quote: string) {
+  const content = root.textContent || "";
+  const start = content.indexOf(quote);
+  if (start < 0) return null;
+  const end = start + quote.length;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let cursor = 0;
+  let startNode: Text | null = null;
+  let endNode: Text | null = null;
+  let startOffset = 0;
+  let endOffset = 0;
+  let node = walker.nextNode() as Text | null;
+  while (node) {
+    const next = cursor + node.data.length;
+    if (!startNode && start >= cursor && start <= next) {
+      startNode = node;
+      startOffset = start - cursor;
+    }
+    if (end >= cursor && end <= next) {
+      endNode = node;
+      endOffset = end - cursor;
+      break;
+    }
+    cursor = next;
+    node = walker.nextNode() as Text | null;
+  }
+  if (!startNode || !endNode) return null;
+  const range = document.createRange();
+  range.setStart(startNode, startOffset);
+  range.setEnd(endNode, endOffset);
+  return range;
 }
 
 function apiUrl(base: string, pathname: string) {
@@ -58,13 +94,16 @@ class AnnoteWidget {
   private readonly root: ShadowRoot;
   private token = "";
   private picking = false;
+  private selectingText = false;
   private selected: SelectedTarget | null = null;
   private annotations: Annotation[] = [];
+  private readonly highlightName: string;
 
   constructor(private readonly options: AnnoteOptions) {
     this.host.dataset.annoteWidget = "true";
     this.root = this.host.attachShadow({ mode: "open" });
     this.token = sessionStorage.getItem(this.sessionKey()) || "";
+    this.highlightName = `annote-feedback-${this.options.reviewId}`;
   }
 
   mount() {
@@ -79,6 +118,11 @@ class AnnoteWidget {
         .launcher { position: fixed; right: 22px; bottom: 22px; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: #17211f; color: #fff; box-shadow: 0 12px 28px rgba(23,33,31,.25); pointer-events: auto; transition: transform .16s ease, background .16s ease; }
         .launcher:hover { transform: translateY(-2px); background: #008f7a; }
         .launcher svg { width: 20px; height: 20px; }
+        .text-launcher { position: fixed; right: 80px; bottom: 28px; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #c7d1ca; border-radius: 50%; background: #fff; color: #43524c; box-shadow: 0 8px 20px rgba(23,33,31,.16); pointer-events: auto; }
+        .text-launcher:hover { border-color: #008f7a; color: #008f7a; }
+        .text-launcher svg { width: 17px; height: 17px; }
+        .count { position: absolute; right: -4px; top: -4px; min-width: 19px; height: 19px; display: grid; place-items: center; padding: 0 4px; border: 2px solid #fff; border-radius: 50%; background: #ef6b50; color: #fff; font-size: 10px; font-weight: 800; }
+        .count[hidden] { display: none; }
         [data-tooltip]::after { content: attr(data-tooltip); position: absolute; right: 58px; top: 50%; transform: translateY(-50%); width: max-content; max-width: 220px; padding: 7px 9px; border-radius: 4px; background: #17211f; color: #fff; font-size: 12px; line-height: 1.2; opacity: 0; pointer-events: none; transition: opacity .14s ease; }
         [data-tooltip]:hover::after { opacity: 1; }
         .outline { position: fixed; display: none; border: 2px solid #008f7a; background: rgba(0,143,122,.08); border-radius: 3px; pointer-events: none; }
@@ -118,7 +162,8 @@ class AnnoteWidget {
       <div class="layer">
         <div class="outline"></div>
         <div class="pick-banner" hidden><i data-lucide="crosshair"></i><span>Select the part you want to discuss</span></div>
-        <button class="launcher" data-action="launcher" data-tooltip="Leave feedback" aria-label="Leave feedback"><i data-lucide="message-square"></i></button>
+        <button class="text-launcher" data-action="highlight" data-tooltip="Highlight text" aria-label="Highlight text"><i data-lucide="highlighter"></i></button>
+        <button class="launcher" data-action="launcher" data-tooltip="Add feedback point" aria-label="Add feedback point"><i data-lucide="message-square"></i><span class="count" hidden></span></button>
         <section class="unlock" hidden aria-label="Unlock feedback">
           <div class="panel-top"><h2>Leave feedback</h2><button class="icon-button" data-action="close-unlock" aria-label="Close" title="Close"><i data-lucide="x"></i></button></div>
           <p class="hint">Enter the review code your team shared with you.</p>
@@ -145,7 +190,7 @@ class AnnoteWidget {
   }
 
   private renderIcons() {
-    const icons = { check: Check, crosshair: Crosshair, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, send: Send, x: X };
+    const icons = { check: Check, crosshair: Crosshair, highlighter: Highlighter, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, send: Send, x: X };
     this.root.querySelectorAll<HTMLElement>("i[data-lucide]").forEach((placeholder) => {
       const icon = icons[placeholder.dataset.lucide as keyof typeof icons];
       if (!icon) return;
@@ -164,6 +209,10 @@ class AnnoteWidget {
       if (this.token) this.startPicking();
       else this.showUnlock();
     });
+    this.element<HTMLButtonElement>("[data-action='highlight']").addEventListener("click", () => {
+      if (this.token) this.startTextSelecting();
+      else this.showUnlock();
+    });
     this.root.querySelectorAll("[data-action='close-unlock']").forEach((button) => button.addEventListener("click", () => this.hideUnlock()));
     this.root.querySelectorAll("[data-action='cancel-comment']").forEach((button) => button.addEventListener("click", () => this.cancelComment()));
     this.element<HTMLFormElement>("[data-form='unlock']").addEventListener("submit", (event) => this.unlock(event));
@@ -173,6 +222,7 @@ class AnnoteWidget {
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         if (this.picking) this.stopPicking();
+        else if (this.selectingText) this.stopTextSelecting();
         else this.cancelComment();
       }
     });
@@ -214,8 +264,10 @@ class AnnoteWidget {
 
   private startPicking() {
     this.cancelComment();
+    this.stopTextSelecting();
     this.picking = true;
     document.body.style.cursor = "crosshair";
+    this.element<HTMLElement>(".pick-banner").querySelector("span")!.textContent = "Select the part you want to discuss";
     this.element<HTMLElement>(".pick-banner").hidden = false;
     document.addEventListener("pointermove", this.highlightTarget, true);
     document.addEventListener("click", this.pickTarget, true);
@@ -228,6 +280,21 @@ class AnnoteWidget {
     this.element<HTMLElement>(".outline").style.display = "none";
     document.removeEventListener("pointermove", this.highlightTarget, true);
     document.removeEventListener("click", this.pickTarget, true);
+  }
+
+  private startTextSelecting() {
+    this.cancelComment();
+    this.stopPicking();
+    this.selectingText = true;
+    this.element<HTMLElement>(".pick-banner").querySelector("span")!.textContent = "Select the text you want to discuss";
+    this.element<HTMLElement>(".pick-banner").hidden = false;
+    document.addEventListener("pointerup", this.pickText, true);
+  }
+
+  private stopTextSelecting() {
+    this.selectingText = false;
+    this.element<HTMLElement>(".pick-banner").hidden = true;
+    document.removeEventListener("pointerup", this.pickText, true);
   }
 
   private highlightTarget = (event: PointerEvent) => {
@@ -246,6 +313,33 @@ class AnnoteWidget {
     this.selected = targetFor(target);
     this.stopPicking();
     this.openComposer();
+  };
+
+  private pickText = (event: PointerEvent) => {
+    if (this.host.contains(event.target as Node)) return;
+    window.setTimeout(() => {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount || selection.isCollapsed) return;
+      const range = selection.getRangeAt(0);
+      const quote = selection.toString().trim();
+      const root = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? range.commonAncestorContainer as Element
+        : range.commonAncestorContainer.parentElement;
+      if (!root || !quote || this.host.contains(root)) return;
+      const rect = range.getBoundingClientRect();
+      this.selected = {
+        element: root,
+        selector: selectorFor(root),
+        label: "Selected text",
+        text: quote.slice(0, 180),
+        quote,
+        kind: "text",
+        position: { x: Math.round(rect.left + window.scrollX), y: Math.round(rect.top + window.scrollY) },
+      };
+      selection.removeAllRanges();
+      this.stopTextSelecting();
+      this.openComposer();
+    }, 0);
   };
 
   private openComposer() {
@@ -267,15 +361,17 @@ class AnnoteWidget {
     error.hidden = true;
   }
 
-  private showNotice() {
+  private showNotice(message = "Feedback sent") {
     const notice = this.element<HTMLElement>(".notice");
+    notice.querySelector("span")!.textContent = message;
     notice.hidden = false;
     window.setTimeout(() => { notice.hidden = true; }, 2200);
   }
 
   private async sendComment(event: SubmitEvent) {
     event.preventDefault();
-    if (!this.selected) return;
+    const selected = this.selected;
+    if (!selected) return;
     const form = event.currentTarget as HTMLFormElement;
     const error = form.querySelector<HTMLElement>(".error")!;
     error.hidden = true;
@@ -287,10 +383,12 @@ class AnnoteWidget {
         body: JSON.stringify({
           comment,
           anchor: {
-            selector: this.selected.selector,
-            label: this.selected.label,
-            text: this.selected.text,
-            position: this.selected.position,
+            selector: selected.selector,
+            label: selected.label,
+            text: selected.text,
+            position: selected.position,
+            kind: selected.kind,
+            ...(selected.quote ? { quote: selected.quote } : {}),
           },
           page: {
             url: window.location.href,
@@ -303,8 +401,11 @@ class AnnoteWidget {
       if (!response.ok) throw new Error(annotation.error || "Could not send feedback.");
       this.annotations.push(annotation);
       this.renderMarkers();
+      const nextMode = selected.kind;
       this.cancelComment();
-      this.showNotice();
+      this.showNotice(`Feedback ${this.annotations.length} saved. Add another point or press Escape.`);
+      if (nextMode === "text") this.startTextSelecting();
+      else this.startPicking();
     } catch (caught) {
       error.textContent = caught instanceof Error ? caught.message : "Could not send feedback.";
       error.hidden = false;
@@ -325,8 +426,12 @@ class AnnoteWidget {
   private renderMarkers() {
     const markers = this.element<HTMLElement>(".markers");
     markers.replaceChildren();
+    const count = this.element<HTMLElement>(".count");
+    count.textContent = String(this.annotations.length);
+    count.hidden = this.annotations.length === 0;
+    this.renderHighlights();
     this.annotations.forEach((annotation, index) => {
-      const anchored = document.querySelector(annotation.anchor.selector);
+      const anchored = annotation.anchor.kind === "text" ? null : document.querySelector(annotation.anchor.selector);
       const rect = anchored?.getBoundingClientRect();
       const point = rect
         ? { x: rect.right - 8, y: rect.top - 8 }
@@ -346,10 +451,31 @@ class AnnoteWidget {
     const card = this.element<HTMLElement>(".marker-card");
     const rect = marker.getBoundingClientRect();
     card.innerHTML = `<strong>Feedback</strong><p></p>`;
-    card.querySelector("p")!.textContent = annotation.comment;
+    card.querySelector("p")!.textContent = annotation.anchor.kind === "text" ? `“${annotation.anchor.quote || annotation.anchor.text}” — ${annotation.comment}` : annotation.comment;
     card.style.left = `${Math.min(window.innerWidth - 316, Math.max(16, rect.left - 258))}px`;
     card.style.top = `${Math.max(16, rect.top + 32)}px`;
     card.hidden = !card.hidden;
+  }
+
+  private renderHighlights() {
+    const highlightConstructor = (globalThis as typeof globalThis & { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
+    const registry = (CSS as typeof CSS & { highlights?: { set(name: string, highlight: unknown): void; delete(name: string): void } }).highlights;
+    if (!highlightConstructor || !registry) return;
+    const ranges = this.annotations.flatMap((annotation) => {
+      if (annotation.anchor.kind !== "text" || !annotation.anchor.quote) return [];
+      const root = document.querySelector(annotation.anchor.selector);
+      const range = root ? textRangeFor(root, annotation.anchor.quote) : null;
+      return range ? [range] : [];
+    });
+    registry.delete(this.highlightName);
+    if (ranges.length) registry.set(this.highlightName, new highlightConstructor(...ranges));
+    let style = document.head.querySelector<HTMLStyleElement>("style[data-annote-highlight-style]");
+    if (!style) {
+      style = document.createElement("style");
+      style.dataset.annoteHighlightStyle = "true";
+      document.head.append(style);
+    }
+    style.textContent = `::highlight(${this.highlightName}) { background: rgba(255, 214, 94, .72); color: inherit; }`;
   }
 }
 

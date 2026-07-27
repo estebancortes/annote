@@ -12,6 +12,8 @@ export interface Annotation {
     label: string;
     text: string;
     position: { x: number; y: number };
+    kind?: "element" | "text";
+    quote?: string;
   };
   page: {
     url: string;
