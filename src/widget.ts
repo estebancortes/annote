@@ -1,4 +1,4 @@
-import { Check, Crosshair, Highlighter, LockKeyhole, MessageSquare, Send, X, createElement } from "lucide";
+import { Check, Crosshair, Highlighter, LockKeyhole, MessageSquare, MousePointer2, Pencil, Send, X, createElement } from "lucide";
 import type { Annotation } from "./types";
 
 export interface AnnoteOptions {
@@ -96,6 +96,7 @@ class AnnoteWidget {
   private picking = false;
   private selectingText = false;
   private selected: SelectedTarget | null = null;
+  private editingAnnotation: Annotation | null = null;
   private annotations: Annotation[] = [];
   private readonly highlightName: string;
 
@@ -118,16 +119,13 @@ class AnnoteWidget {
         .launcher { position: fixed; right: 22px; bottom: 22px; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: #17211f; color: #fff; box-shadow: 0 12px 28px rgba(23,33,31,.25); pointer-events: auto; transition: transform .16s ease, background .16s ease; }
         .launcher:hover { transform: translateY(-2px); background: #008f7a; }
         .launcher svg { width: 20px; height: 20px; }
-        .text-launcher { position: fixed; right: 80px; bottom: 28px; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #c7d1ca; border-radius: 50%; background: #fff; color: #43524c; box-shadow: 0 8px 20px rgba(23,33,31,.16); pointer-events: auto; }
-        .text-launcher:hover { border-color: #008f7a; color: #008f7a; }
-        .text-launcher svg { width: 17px; height: 17px; }
         .count { position: absolute; right: -4px; top: -4px; min-width: 19px; height: 19px; display: grid; place-items: center; padding: 0 4px; border: 2px solid #fff; border-radius: 50%; background: #ef6b50; color: #fff; font-size: 10px; font-weight: 800; }
         .count[hidden] { display: none; }
         [data-tooltip]::after { content: attr(data-tooltip); position: absolute; right: 58px; top: 50%; transform: translateY(-50%); width: max-content; max-width: 220px; padding: 7px 9px; border-radius: 4px; background: #17211f; color: #fff; font-size: 12px; line-height: 1.2; opacity: 0; pointer-events: none; transition: opacity .14s ease; }
         [data-tooltip]:hover::after { opacity: 1; }
         .outline { position: fixed; display: none; border: 2px solid #008f7a; background: rgba(0,143,122,.08); border-radius: 3px; pointer-events: none; }
-        .composer, .unlock, .notice { position: fixed; right: 22px; bottom: 82px; width: min(360px, calc(100vw - 32px)); padding: 18px; border: 1px solid #c7d1ca; border-radius: 7px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; }
-        .composer[hidden], .unlock[hidden], .notice[hidden] { display: none; }
+        .composer, .unlock, .notice, .review-panel { position: fixed; right: 22px; bottom: 82px; width: min(360px, calc(100vw - 32px)); padding: 18px; border: 1px solid #c7d1ca; border-radius: 7px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; }
+        .composer[hidden], .unlock[hidden], .notice[hidden], .review-panel[hidden] { display: none; }
         .panel-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
         .icon-button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 4px; background: transparent; color: #53645f; }
@@ -149,6 +147,21 @@ class AnnoteWidget {
         .error { color: #b42318; }
         .notice { display: flex; align-items: center; gap: 10px; color: #245c4f; font-size: 13px; font-weight: 700; }
         .notice svg { width: 18px; height: 18px; color: #008f7a; flex: 0 0 auto; }
+        .review-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 15px 0 13px; }
+        .review-action { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #b7c7be; border-radius: 4px; background: #fff; color: #33433e; font-size: 12px; font-weight: 760; }
+        .review-action.primary { border-color: #008f7a; background: #008f7a; color: #fff; }
+        .review-action svg { width: 15px; height: 15px; }
+        .feedback-list { display: grid; gap: 1px; max-height: min(300px, 38vh); overflow: auto; border-top: 1px solid #dce4df; }
+        .feedback-entry { display: grid; grid-template-columns: 24px minmax(0, 1fr) 28px; gap: 9px; align-items: start; padding: 11px 0; border-bottom: 1px solid #e2e8e4; }
+        .feedback-entry:last-child { border-bottom: 0; }
+        .feedback-number { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: #ef6b50; color: #fff; font-size: 11px; font-weight: 800; }
+        .feedback-jump { min-width: 0; padding: 0; border: 0; background: transparent; color: #33433e; text-align: left; font-size: 13px; line-height: 1.35; }
+        .feedback-jump:hover { color: #008f7a; }
+        .feedback-context { display: block; overflow: hidden; margin-top: 3px; color: #718078; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+        .feedback-edit { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px; background: transparent; color: #63736c; }
+        .feedback-edit:hover { background: #eaf1ed; color: #008f7a; }
+        .feedback-edit svg { width: 15px; height: 15px; }
+        .feedback-empty { margin: 0; padding: 16px 0 3px; color: #718078; font-size: 12px; line-height: 1.45; }
         .marker { position: fixed; width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; background: #ef6b50; color: #fff; box-shadow: 0 5px 12px rgba(104,36,21,.28); font-size: 12px; font-weight: 800; pointer-events: auto; }
         .marker:hover { transform: scale(1.08); }
         .marker-card { position: fixed; width: min(300px, calc(100vw - 32px)); padding: 14px; border: 1px solid #c7d1ca; border-radius: 7px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; }
@@ -157,13 +170,12 @@ class AnnoteWidget {
         .pick-banner { position: fixed; left: 50%; top: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 9px; padding: 10px 13px; border-radius: 5px; background: #17211f; color: #fff; box-shadow: 0 10px 24px rgba(23,33,31,.2); font-size: 13px; font-weight: 700; pointer-events: none; }
         .pick-banner[hidden] { display: none; }
         .pick-banner svg { width: 16px; height: 16px; color: #73d7ba; }
-        @media (max-width: 560px) { .launcher { right: 16px; bottom: 16px; } .composer, .unlock, .notice { right: 16px; bottom: 74px; } }
+        @media (max-width: 560px) { .launcher { right: 16px; bottom: 16px; } .composer, .unlock, .notice, .review-panel { right: 16px; bottom: 74px; } }
       </style>
       <div class="layer">
         <div class="outline"></div>
         <div class="pick-banner" hidden><i data-lucide="crosshair"></i><span>Select the part you want to discuss</span></div>
-        <button class="text-launcher" data-action="highlight" data-tooltip="Highlight text" aria-label="Highlight text"><i data-lucide="highlighter"></i></button>
-        <button class="launcher" data-action="launcher" data-tooltip="Add feedback point" aria-label="Add feedback point"><i data-lucide="message-square"></i><span class="count" hidden></span></button>
+        <button class="launcher" data-action="launcher" data-tooltip="Open feedback" aria-label="Open feedback"><i data-lucide="message-square"></i><span class="count" hidden></span></button>
         <section class="unlock" hidden aria-label="Unlock feedback">
           <div class="panel-top"><h2>Leave feedback</h2><button class="icon-button" data-action="close-unlock" aria-label="Close" title="Close"><i data-lucide="x"></i></button></div>
           <p class="hint">Enter the review code your team shared with you.</p>
@@ -173,6 +185,11 @@ class AnnoteWidget {
           <div class="panel-top"><h2>New feedback</h2><button class="icon-button" data-action="cancel-comment" aria-label="Cancel comment" title="Cancel"><i data-lucide="x"></i></button></div>
           <div class="target"></div>
           <form data-form="comment"><label for="annote-comment">What should change?</label><textarea id="annote-comment" name="comment" maxlength="1200" required placeholder="Describe the feedback clearly..."></textarea><p class="error" hidden></p><div class="actions"><button class="text-button" type="button" data-action="cancel-comment">Cancel</button><button class="primary" type="submit"><i data-lucide="send"></i>Send</button></div></form>
+        </section>
+        <section class="review-panel" hidden aria-label="Your feedback">
+          <div class="panel-top"><h2>Your feedback</h2><button class="icon-button" data-action="close-review" aria-label="Close feedback panel" title="Close"><i data-lucide="x"></i></button></div>
+          <div class="review-actions"><button class="review-action primary" data-action="add-point"><i data-lucide="mouse-pointer-2"></i>Add point</button><button class="review-action" data-action="highlight"><i data-lucide="highlighter"></i>Highlight text</button></div>
+          <div class="feedback-list"></div>
         </section>
         <aside class="notice" hidden><i data-lucide="check"></i><span>Feedback sent</span></aside>
         <aside class="marker-card" hidden></aside>
@@ -190,7 +207,7 @@ class AnnoteWidget {
   }
 
   private renderIcons() {
-    const icons = { check: Check, crosshair: Crosshair, highlighter: Highlighter, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, send: Send, x: X };
+    const icons = { check: Check, crosshair: Crosshair, highlighter: Highlighter, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, "mouse-pointer-2": MousePointer2, pencil: Pencil, send: Send, x: X };
     this.root.querySelectorAll<HTMLElement>("i[data-lucide]").forEach((placeholder) => {
       const icon = icons[placeholder.dataset.lucide as keyof typeof icons];
       if (!icon) return;
@@ -206,13 +223,12 @@ class AnnoteWidget {
 
   private bind() {
     this.element<HTMLButtonElement>("[data-action='launcher']").addEventListener("click", () => {
-      if (this.token) this.startPicking();
+      if (this.token) this.toggleReviewPanel();
       else this.showUnlock();
     });
-    this.element<HTMLButtonElement>("[data-action='highlight']").addEventListener("click", () => {
-      if (this.token) this.startTextSelecting();
-      else this.showUnlock();
-    });
+    this.element<HTMLButtonElement>("[data-action='add-point']").addEventListener("click", () => this.startPicking());
+    this.element<HTMLButtonElement>("[data-action='highlight']").addEventListener("click", () => this.startTextSelecting());
+    this.element<HTMLButtonElement>("[data-action='close-review']").addEventListener("click", () => this.hideReviewPanel());
     this.root.querySelectorAll("[data-action='close-unlock']").forEach((button) => button.addEventListener("click", () => this.hideUnlock()));
     this.root.querySelectorAll("[data-action='cancel-comment']").forEach((button) => button.addEventListener("click", () => this.cancelComment()));
     this.element<HTMLFormElement>("[data-form='unlock']").addEventListener("submit", (event) => this.unlock(event));
@@ -255,7 +271,7 @@ class AnnoteWidget {
       sessionStorage.setItem(this.sessionKey(), this.token);
       this.hideUnlock();
       await this.loadAnnotations();
-      this.startPicking();
+      this.showReviewPanel();
     } catch (caught) {
       error.textContent = caught instanceof Error ? caught.message : "Could not unlock feedback.";
       error.hidden = false;
@@ -263,7 +279,8 @@ class AnnoteWidget {
   }
 
   private startPicking() {
-    this.cancelComment();
+    this.cancelComment(false);
+    this.hideReviewPanel();
     this.stopTextSelecting();
     this.picking = true;
     document.body.style.cursor = "crosshair";
@@ -283,7 +300,8 @@ class AnnoteWidget {
   }
 
   private startTextSelecting() {
-    this.cancelComment();
+    this.cancelComment(false);
+    this.hideReviewPanel();
     this.stopPicking();
     this.selectingText = true;
     this.element<HTMLElement>(".pick-banner").querySelector("span")!.textContent = "Select the text you want to discuss";
@@ -342,23 +360,32 @@ class AnnoteWidget {
     }, 0);
   };
 
-  private openComposer() {
-    if (!this.selected) return;
+  private openComposer(editing?: Annotation) {
+    if (!this.selected && !editing) return;
+    this.editingAnnotation = editing || null;
     const composer = this.element<HTMLElement>(".composer");
     const target = this.element<HTMLElement>(".target");
-    target.textContent = this.selected.text ? `${this.selected.label}: ${this.selected.text}` : `Selected ${this.selected.label}`;
+    const heading = composer.querySelector("h2")!;
+    const textarea = this.element<HTMLTextAreaElement>("#annote-comment");
+    const anchor = editing?.anchor || this.selected!;
+    heading.textContent = editing ? "Edit feedback" : "New feedback";
+    target.textContent = anchor.text ? `${anchor.label}: ${anchor.text}` : `Selected ${anchor.label}`;
+    textarea.value = editing?.comment || "";
+    this.hideReviewPanel();
     composer.hidden = false;
-    window.setTimeout(() => this.element<HTMLTextAreaElement>("#annote-comment").focus(), 0);
+    window.setTimeout(() => textarea.focus(), 0);
   }
 
-  private cancelComment() {
+  private cancelComment(showPanel = true) {
     this.selected = null;
+    this.editingAnnotation = null;
     const composer = this.element<HTMLElement>(".composer");
     composer.hidden = true;
     const form = this.element<HTMLFormElement>("[data-form='comment']");
     form.reset();
     const error = form.querySelector<HTMLElement>(".error")!;
     error.hidden = true;
+    if (showPanel && this.token && !this.picking && !this.selectingText) this.showReviewPanel();
   }
 
   private showNotice(message = "Feedback sent") {
@@ -368,27 +395,74 @@ class AnnoteWidget {
     window.setTimeout(() => { notice.hidden = true; }, 2200);
   }
 
+  private showReviewPanel() {
+    if (!this.token) return;
+    this.renderReviewPanel();
+    this.element<HTMLElement>(".review-panel").hidden = false;
+    this.element<HTMLButtonElement>("[data-action='launcher']").dataset.tooltip = "Hide feedback";
+  }
+
+  private hideReviewPanel() {
+    this.element<HTMLElement>(".review-panel").hidden = true;
+    this.element<HTMLButtonElement>("[data-action='launcher']").dataset.tooltip = "Open feedback";
+  }
+
+  private toggleReviewPanel() {
+    if (this.element<HTMLElement>(".review-panel").hidden) this.showReviewPanel();
+    else this.hideReviewPanel();
+  }
+
+  private renderReviewPanel() {
+    const list = this.element<HTMLElement>(".feedback-list");
+    list.innerHTML = this.annotations.length
+      ? this.annotations.map((annotation, index) => `<article class="feedback-entry"><span class="feedback-number">${index + 1}</span><button class="feedback-jump" data-action="jump-feedback" data-id="${annotation.id}"><span>${this.escapeHtml(annotation.comment)}</span><span class="feedback-context">${this.escapeHtml(annotation.anchor.kind === "text" ? annotation.anchor.quote || annotation.anchor.text : annotation.anchor.label)}</span></button><button class="feedback-edit" data-action="edit-feedback" data-id="${annotation.id}" aria-label="Edit feedback ${index + 1}" title="Edit feedback"><i data-lucide="pencil"></i></button></article>`).join("")
+      : '<p class="feedback-empty">Add a point or highlight text to begin your review.</p>';
+    this.renderIcons();
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='jump-feedback']").forEach((button) => button.addEventListener("click", () => {
+      const annotation = this.annotations.find((entry) => entry.id === button.dataset.id);
+      if (annotation) this.focusFeedback(annotation);
+    }));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='edit-feedback']").forEach((button) => button.addEventListener("click", () => {
+      const annotation = this.annotations.find((entry) => entry.id === button.dataset.id);
+      if (annotation) this.openComposer(annotation);
+    }));
+  }
+
+  private focusFeedback(annotation: Annotation) {
+    const anchored = document.querySelector(annotation.anchor.selector);
+    anchored?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const marker = this.element<HTMLElement>(`[data-marker-id="${annotation.id}"]`);
+    if (marker) this.showMarker(annotation, marker);
+  }
+
+  private escapeHtml(value: string) {
+    return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+  }
+
   private async sendComment(event: SubmitEvent) {
     event.preventDefault();
     const selected = this.selected;
-    if (!selected) return;
+    const editing = this.editingAnnotation;
+    if (!selected && !editing) return;
     const form = event.currentTarget as HTMLFormElement;
     const error = form.querySelector<HTMLElement>(".error")!;
     error.hidden = true;
     const comment = String(new FormData(form).get("comment") || "").trim();
     try {
-      const response = await fetch(apiUrl(this.options.apiBase, `/api/reviews/${this.options.reviewId}/annotations`), {
-        method: "POST",
+      const response = await fetch(apiUrl(this.options.apiBase, editing
+        ? `/api/reviews/${this.options.reviewId}/annotations/${editing.id}`
+        : `/api/reviews/${this.options.reviewId}/annotations`), {
+        method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
-        body: JSON.stringify({
+        body: JSON.stringify(editing ? { comment } : {
           comment,
           anchor: {
-            selector: selected.selector,
-            label: selected.label,
-            text: selected.text,
-            position: selected.position,
-            kind: selected.kind,
-            ...(selected.quote ? { quote: selected.quote } : {}),
+            selector: selected!.selector,
+            label: selected!.label,
+            text: selected!.text,
+            position: selected!.position,
+            kind: selected!.kind,
+            ...(selected!.quote ? { quote: selected!.quote } : {}),
           },
           page: {
             url: window.location.href,
@@ -399,13 +473,12 @@ class AnnoteWidget {
       });
       const annotation = await response.json();
       if (!response.ok) throw new Error(annotation.error || "Could not send feedback.");
-      this.annotations.push(annotation);
+      if (editing) this.annotations = this.annotations.map((entry) => entry.id === annotation.id ? annotation : entry);
+      else this.annotations.push(annotation);
       this.renderMarkers();
-      const nextMode = selected.kind;
-      this.cancelComment();
-      this.showNotice(`Feedback ${this.annotations.length} saved. Add another point or press Escape.`);
-      if (nextMode === "text") this.startTextSelecting();
-      else this.startPicking();
+      this.cancelComment(false);
+      this.showReviewPanel();
+      this.showNotice(editing ? "Feedback updated" : `Feedback ${this.annotations.length} saved`);
     } catch (caught) {
       error.textContent = caught instanceof Error ? caught.message : "Could not send feedback.";
       error.hidden = false;
@@ -430,6 +503,7 @@ class AnnoteWidget {
     count.textContent = String(this.annotations.length);
     count.hidden = this.annotations.length === 0;
     this.renderHighlights();
+    this.renderReviewPanel();
     this.annotations.forEach((annotation, index) => {
       const anchored = annotation.anchor.kind === "text" ? null : document.querySelector(annotation.anchor.selector);
       const rect = anchored?.getBoundingClientRect();
@@ -438,6 +512,7 @@ class AnnoteWidget {
         : { x: annotation.anchor.position.x - window.scrollX, y: annotation.anchor.position.y - window.scrollY };
       const marker = document.createElement("button");
       marker.className = "marker";
+      marker.dataset.markerId = annotation.id;
       marker.textContent = String(index + 1);
       marker.style.left = `${Math.max(8, point.x)}px`;
       marker.style.top = `${Math.max(8, point.y)}px`;

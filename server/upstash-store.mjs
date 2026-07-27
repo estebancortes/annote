@@ -96,6 +96,13 @@ export function createUpstashStore() {
       await command("SET", annotationKey(id), JSON.stringify(updated));
       return updated;
     },
+    async updateAnnotationComment(id, comment, updatedAt) {
+      const annotation = parse(await command("GET", annotationKey(id)));
+      if (!annotation) return null;
+      const updated = { ...annotation, comment, updatedAt };
+      await command("SET", annotationKey(id), JSON.stringify(updated));
+      return updated;
+    },
     async createSession(token, session, ttlSeconds) {
       await command("SET", `${prefix}session:${token}`, JSON.stringify(session), "EX", ttlSeconds);
     },

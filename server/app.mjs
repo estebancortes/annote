@@ -154,6 +154,16 @@ export function createApiApp({ store, adminKey }) {
     response.status(201).json(annotation);
   });
 
+  app.patch("/api/reviews/:reviewId/annotations/:annotationId", async (request, response) => {
+    const project = await store.findProject(request.params.reviewId);
+    if (!project || !(await sessionFor(request, project.id))) return response.status(401).json({ error: "Review session required." });
+    const comment = String(request.body?.comment || "").trim();
+    if (comment.length < 2 || comment.length > 1200) return response.status(400).json({ error: "Comments need between 2 and 1200 characters." });
+    const annotation = await store.updateAnnotationComment(request.params.annotationId, comment, new Date().toISOString());
+    if (!annotation || annotation.projectId !== project.id) return response.status(404).json({ error: "Feedback not found." });
+    response.json(annotation);
+  });
+
   app.get("/api/projects/:projectId/annotations", requireAdmin, async (request, response) => {
     response.json(await store.listAnnotations(request.params.projectId));
   });
