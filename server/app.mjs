@@ -135,9 +135,12 @@ export function createApiApp({ store, adminKey }) {
     response.json(annotation);
   });
 
-  app.use((error, _request, response, _next) => {
+  app.use((error, request, response, _next) => {
     console.error(error);
-    response.status(500).json({ error: "Annote could not process that request." });
+    const isDashboardRequest = request.get("x-annote-admin-key") === adminKey;
+    response.status(500).json({
+      error: isDashboardRequest && error instanceof Error ? error.message : "Annote could not process that request.",
+    });
   });
 
   return app;
