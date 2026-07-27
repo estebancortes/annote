@@ -65,7 +65,7 @@ export function createApiApp({ store, adminKey }) {
         response.setHeader("Access-Control-Allow-Origin", origin);
         response.setHeader("Vary", "Origin");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Annote-Admin-Key");
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
       }
       if (request.method === "OPTIONS") return response.status(204).end();
       next();
@@ -164,6 +164,15 @@ export function createApiApp({ store, adminKey }) {
     response.json(annotation);
   });
 
+  app.delete("/api/reviews/:reviewId/annotations/:annotationId", async (request, response) => {
+    const project = await store.findProject(request.params.reviewId);
+    if (!project || !(await sessionFor(request, project.id))) return response.status(401).json({ error: "Review session required." });
+    const annotation = (await store.listAnnotations(project.id)).find((entry) => entry.id === request.params.annotationId);
+    if (!annotation) return response.status(404).json({ error: "Feedback not found." });
+    await store.deleteAnnotation(annotation.id);
+    response.status(204).end();
+  });
+
   app.get("/api/projects/:projectId/annotations", requireAdmin, async (request, response) => {
     response.json(await store.listAnnotations(request.params.projectId));
   });
@@ -173,6 +182,11 @@ export function createApiApp({ store, adminKey }) {
     const annotation = await store.updateAnnotation(request.params.annotationId, request.body.status, new Date().toISOString());
     if (!annotation) return response.status(404).json({ error: "Annotation not found." });
     response.json(annotation);
+  });
+
+  app.delete("/api/annotations/:annotationId", requireAdmin, async (request, response) => {
+    if (!(await store.deleteAnnotation(request.params.annotationId))) return response.status(404).json({ error: "Annotation not found." });
+    response.status(204).end();
   });
 
   app.use((error, request, response, _next) => {

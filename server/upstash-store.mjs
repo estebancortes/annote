@@ -103,6 +103,15 @@ export function createUpstashStore() {
       await command("SET", annotationKey(id), JSON.stringify(updated));
       return updated;
     },
+    async deleteAnnotation(id) {
+      const annotation = parse(await command("GET", annotationKey(id)));
+      if (!annotation) return false;
+      await Promise.all([
+        command("DEL", annotationKey(id)),
+        command("ZREM", annotationIndexKey(annotation.projectId), id),
+      ]);
+      return true;
+    },
     async createSession(token, session, ttlSeconds) {
       await command("SET", `${prefix}session:${token}`, JSON.stringify(session), "EX", ttlSeconds);
     },

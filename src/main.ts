@@ -1,4 +1,4 @@
-import { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Pencil, Plus, RotateCcw, Settings2, X, createIcons } from "lucide";
+import { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Pencil, Plus, RotateCcw, Settings2, Trash2, X, createIcons } from "lucide";
 import type { Annotation, Project } from "./types";
 import "./style.css";
 
@@ -16,7 +16,7 @@ class ApiError extends Error {
 }
 
 function iconify() {
-  createIcons({ icons: { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Pencil, Plus, RotateCcw, Settings2, X }, attrs: { "stroke-width": 2 } });
+  createIcons({ icons: { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Pencil, Plus, RotateCcw, Settings2, Trash2, X }, attrs: { "stroke-width": 2 } });
 }
 
 async function request<T>(pathname: string, init: RequestInit = {}) {
@@ -115,6 +115,7 @@ function renderDashboard(project: Project, projects: Project[], annotations: Ann
   bindCreateProjectDialog();
   bindProjectSettingsDialog(project);
   app.querySelectorAll<HTMLButtonElement>("[data-status]").forEach((button) => button.addEventListener("click", () => updateStatus(button.dataset.id!, button.dataset.status as Annotation["status"])));
+  app.querySelectorAll<HTMLButtonElement>("[data-delete]").forEach((button) => button.addEventListener("click", () => deleteAnnotation(button.dataset.delete!)));
 }
 
 function renderEmptyDashboard() {
@@ -259,10 +260,11 @@ function renderSetupView(project: Project) {
 function annotationRow(annotation: Annotation, number: number) {
   const date = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(annotation.createdAt));
   const resolved = annotation.status === "resolved";
+  const pageUrl = externalUrl(annotation.page.url);
   return `<article class="feedback-row ${resolved ? "is-resolved" : ""}">
     <div class="feedback-index">${number}</div>
-    <div class="feedback-body"><div class="feedback-meta"><span class="element-tag">${escapeHtml(annotation.anchor.label)}</span><span>${date}</span>${resolved ? "<span class=\"resolved-label\">Resolved</span>" : ""}</div><p>${escapeHtml(annotation.comment)}</p><span class="feedback-context">${escapeHtml(annotation.anchor.text || annotation.page.path)}</span></div>
-    <div class="feedback-actions">${resolved ? `<button class="icon-action" data-id="${annotation.id}" data-status="open" title="Reopen feedback" aria-label="Reopen feedback"><i data-lucide="rotate-ccw"></i></button>` : `<button class="icon-action success" data-id="${annotation.id}" data-status="resolved" title="Resolve feedback" aria-label="Resolve feedback"><i data-lucide="check"></i></button>`}</div>
+    <div class="feedback-body"><div class="feedback-meta"><span class="element-tag">${escapeHtml(annotation.anchor.label)}</span><span>${date}</span>${resolved ? "<span class=\"resolved-label\">Resolved</span>" : ""}</div><p>${escapeHtml(annotation.comment)}</p><span class="feedback-context"><span>${escapeHtml(annotation.anchor.quote || annotation.anchor.text || "Selected element")}</span><span>Page ${escapeHtml(annotation.page.path || "/")}</span></span></div>
+    <div class="feedback-actions">${pageUrl ? `<a class="icon-action" href="${escapeHtml(pageUrl)}" target="_blank" rel="noreferrer" title="Open annotated page" aria-label="Open annotated page"><i data-lucide="external-link"></i></a>` : ""}${resolved ? `<button class="icon-action" data-id="${annotation.id}" data-status="open" title="Reopen feedback" aria-label="Reopen feedback"><i data-lucide="rotate-ccw"></i></button>` : `<button class="icon-action success" data-id="${annotation.id}" data-status="resolved" title="Resolve feedback" aria-label="Resolve feedback"><i data-lucide="check"></i></button>`}<button class="icon-action danger" data-delete="${annotation.id}" title="Delete feedback" aria-label="Delete feedback"><i data-lucide="trash-2"></i></button></div>
   </article>`;
 }
 
@@ -272,6 +274,15 @@ function emptyState() {
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]!);
+}
+
+function externalUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 async function copySnippet(project: Project) {
@@ -285,6 +296,12 @@ async function copySnippet(project: Project) {
 
 async function updateStatus(id: string, status: Annotation["status"]) {
   await request<Annotation>(`/api/annotations/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+  await loadDashboard();
+}
+
+async function deleteAnnotation(id: string) {
+  if (!window.confirm("Delete this feedback? This cannot be undone.")) return;
+  await request<void>(`/api/annotations/${id}`, { method: "DELETE" });
   await loadDashboard();
 }
 

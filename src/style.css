@@ -69,10 +69,14 @@ nav { display: grid; gap: 4px; margin-top: 42px; }
 .feedback-body > p { margin: 8px 0; color: #23322d; font-size: 15px; line-height: 1.5; }
 .feedback-context { display: block; overflow: hidden; color: #718078; font-size: 12px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .feedback-actions { display: flex; justify-content: flex-end; }
+.feedback-actions { gap: 7px; }
 .icon-action { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #c2cec7; border-radius: 4px; background: #fff; color: #63736c; }
 .icon-action:hover { border-color: #008f7a; color: #008f7a; }
 .icon-action svg { width: 16px; height: 16px; }
 .icon-action.success { border-color: #9dc8b5; color: #007965; }
+.icon-action.danger { border-color: #f0c1ba; color: #c33d2c; }
+.icon-action.danger:hover { border-color: #d77063; color: #a52a1b; }
+.feedback-context > span + span { display: inline-block; margin-left: 8px; padding-left: 8px; border-left: 1px solid #d8e0da; }
 .empty-state { display: grid; justify-items: start; padding: 40px 0 46px; }
 .empty-icon { display: grid; width: 40px; height: 40px; place-items: center; margin-bottom: 15px; border-radius: 6px; background: #dcebe2; color: #008f7a; }
 .empty-icon svg { width: 19px; height: 19px; }

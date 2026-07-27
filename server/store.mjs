@@ -105,6 +105,7 @@ export function createStore({ databasePath, legacyDataPath }) {
   const insertAnnotation = database.prepare("INSERT INTO annotations (id, project_id, comment, anchor, page, status, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?)");
   const updateAnnotation = database.prepare("UPDATE annotations SET status = ?, updated_at = ? WHERE id = ?");
   const updateAnnotationComment = database.prepare("UPDATE annotations SET comment = ?, updated_at = ? WHERE id = ?");
+  const deleteAnnotation = database.prepare("DELETE FROM annotations WHERE id = ?");
   const sessions = new Map();
 
   return {
@@ -136,6 +137,9 @@ export function createStore({ databasePath, legacyDataPath }) {
     updateAnnotationComment(id, comment, updatedAt) {
       if (updateAnnotationComment.run(comment, updatedAt, id).changes === 0) return null;
       return toAnnotation(getAnnotation.get(id));
+    },
+    deleteAnnotation(id) {
+      return deleteAnnotation.run(id).changes > 0;
     },
     createSession(token, session) {
       sessions.set(token, session);

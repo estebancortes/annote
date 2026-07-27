@@ -1,4 +1,4 @@
-import { Check, Crosshair, Highlighter, LockKeyhole, MessageSquare, MousePointer2, Pencil, Send, X, createElement } from "lucide";
+import { Check, Crosshair, Highlighter, LockKeyhole, MessageSquare, MousePointer2, Pencil, Send, Trash2, X, createElement } from "lucide";
 import type { Annotation } from "./types";
 
 export interface AnnoteOptions {
@@ -41,7 +41,7 @@ function selectorFor(element: Element) {
 
 function targetFor(element: Element): SelectedTarget {
   const rect = element.getBoundingClientRect();
-  const label = element.getAttribute("aria-label") || element.getAttribute("data-annote-id") || element.tagName.toLowerCase();
+  const label = element.getAttribute("aria-label") || element.getAttribute("data-annote-id") || element.getAttribute("alt") || element.tagName.toLowerCase();
   return {
     element,
     selector: selectorFor(element),
@@ -152,15 +152,16 @@ class AnnoteWidget {
         .review-action.primary { border-color: #008f7a; background: #008f7a; color: #fff; }
         .review-action svg { width: 15px; height: 15px; }
         .feedback-list { display: grid; gap: 1px; max-height: min(300px, 38vh); overflow: auto; border-top: 1px solid #dce4df; }
-        .feedback-entry { display: grid; grid-template-columns: 24px minmax(0, 1fr) 28px; gap: 9px; align-items: start; padding: 11px 0; border-bottom: 1px solid #e2e8e4; }
+        .feedback-entry { display: grid; grid-template-columns: 24px minmax(0, 1fr) 28px 28px; gap: 9px; align-items: start; padding: 11px 0; border-bottom: 1px solid #e2e8e4; }
         .feedback-entry:last-child { border-bottom: 0; }
         .feedback-number { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: #ef6b50; color: #fff; font-size: 11px; font-weight: 800; }
         .feedback-jump { min-width: 0; padding: 0; border: 0; background: transparent; color: #33433e; text-align: left; font-size: 13px; line-height: 1.35; }
         .feedback-jump:hover { color: #008f7a; }
         .feedback-context { display: block; overflow: hidden; margin-top: 3px; color: #718078; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-        .feedback-edit { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px; background: transparent; color: #63736c; }
+        .feedback-edit, .feedback-delete { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px; background: transparent; color: #63736c; }
         .feedback-edit:hover { background: #eaf1ed; color: #008f7a; }
-        .feedback-edit svg { width: 15px; height: 15px; }
+        .feedback-delete:hover { background: #fceae7; color: #c33d2c; }
+        .feedback-edit svg, .feedback-delete svg { width: 15px; height: 15px; }
         .feedback-empty { margin: 0; padding: 16px 0 3px; color: #718078; font-size: 12px; line-height: 1.45; }
         .marker { position: fixed; width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; background: #ef6b50; color: #fff; box-shadow: 0 5px 12px rgba(104,36,21,.28); font-size: 12px; font-weight: 800; pointer-events: auto; }
         .marker:hover { transform: scale(1.08); }
@@ -207,7 +208,7 @@ class AnnoteWidget {
   }
 
   private renderIcons() {
-    const icons = { check: Check, crosshair: Crosshair, highlighter: Highlighter, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, "mouse-pointer-2": MousePointer2, pencil: Pencil, send: Send, x: X };
+    const icons = { check: Check, crosshair: Crosshair, highlighter: Highlighter, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, "mouse-pointer-2": MousePointer2, pencil: Pencil, send: Send, "trash-2": Trash2, x: X };
     this.root.querySelectorAll<HTMLElement>("i[data-lucide]").forEach((placeholder) => {
       const icon = icons[placeholder.dataset.lucide as keyof typeof icons];
       if (!icon) return;
@@ -415,7 +416,7 @@ class AnnoteWidget {
   private renderReviewPanel() {
     const list = this.element<HTMLElement>(".feedback-list");
     list.innerHTML = this.annotations.length
-      ? this.annotations.map((annotation, index) => `<article class="feedback-entry"><span class="feedback-number">${index + 1}</span><button class="feedback-jump" data-action="jump-feedback" data-id="${annotation.id}"><span>${this.escapeHtml(annotation.comment)}</span><span class="feedback-context">${this.escapeHtml(annotation.anchor.kind === "text" ? annotation.anchor.quote || annotation.anchor.text : annotation.anchor.label)}</span></button><button class="feedback-edit" data-action="edit-feedback" data-id="${annotation.id}" aria-label="Edit feedback ${index + 1}" title="Edit feedback"><i data-lucide="pencil"></i></button></article>`).join("")
+      ? this.annotations.map((annotation, index) => `<article class="feedback-entry"><span class="feedback-number">${index + 1}</span><button class="feedback-jump" data-action="jump-feedback" data-id="${annotation.id}"><span>${this.escapeHtml(annotation.comment)}</span><span class="feedback-context">${this.escapeHtml(annotation.anchor.kind === "text" ? annotation.anchor.quote || annotation.anchor.text : annotation.anchor.label)}</span></button><button class="feedback-edit" data-action="edit-feedback" data-id="${annotation.id}" aria-label="Edit feedback ${index + 1}" title="Edit feedback"><i data-lucide="pencil"></i></button><button class="feedback-delete" data-action="delete-feedback" data-id="${annotation.id}" aria-label="Delete feedback ${index + 1}" title="Delete feedback"><i data-lucide="trash-2"></i></button></article>`).join("")
       : '<p class="feedback-empty">Add a point or highlight text to begin your review.</p>';
     this.renderIcons();
     this.root.querySelectorAll<HTMLButtonElement>("[data-action='jump-feedback']").forEach((button) => button.addEventListener("click", () => {
@@ -425,6 +426,10 @@ class AnnoteWidget {
     this.root.querySelectorAll<HTMLButtonElement>("[data-action='edit-feedback']").forEach((button) => button.addEventListener("click", () => {
       const annotation = this.annotations.find((entry) => entry.id === button.dataset.id);
       if (annotation) this.openComposer(annotation);
+    }));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='delete-feedback']").forEach((button) => button.addEventListener("click", () => {
+      const annotation = this.annotations.find((entry) => entry.id === button.dataset.id);
+      if (annotation) this.deleteFeedback(annotation);
     }));
   }
 
@@ -437,6 +442,23 @@ class AnnoteWidget {
 
   private escapeHtml(value: string) {
     return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+  }
+
+  private async deleteFeedback(annotation: Annotation) {
+    if (!window.confirm("Delete this feedback? This cannot be undone.")) return;
+    try {
+      const response = await fetch(apiUrl(this.options.apiBase, `/api/reviews/${this.options.reviewId}/annotations/${annotation.id}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${this.token}` },
+      });
+      if (!response.ok) throw new Error("Could not delete feedback.");
+      this.annotations = this.annotations.filter((entry) => entry.id !== annotation.id);
+      this.renderMarkers();
+      this.showReviewPanel();
+      this.showNotice("Feedback deleted");
+    } catch {
+      this.showNotice("Could not delete feedback");
+    }
   }
 
   private async sendComment(event: SubmitEvent) {
