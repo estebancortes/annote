@@ -20,8 +20,10 @@ function iconify() {
 }
 
 async function request<T>(pathname: string, init: RequestInit = {}) {
-  const response = await fetch(`${apiBase}${pathname}`, {
+  const requestUrl = `${apiBase}${pathname}`;
+  const response = await fetch(requestUrl, {
     ...init,
+    cache: "no-store",
     headers: { "X-Annote-Admin-Key": dashboardKey, ...(init.headers || {}) },
   });
   const responseText = await response.text();
@@ -33,7 +35,7 @@ async function request<T>(pathname: string, init: RequestInit = {}) {
     }
   })();
   if (!response.ok) {
-    throw new ApiError(data.error || `The server returned ${response.status}${responseText ? `: ${responseText.slice(0, 160)}` : "."}`, response.status);
+    throw new ApiError(data.error || `${requestUrl} returned ${response.status}${responseText ? `: ${responseText.slice(0, 160)}` : "."}`, response.status);
   }
   return data as T;
 }
@@ -52,7 +54,7 @@ function showUnlock(error = "") {
           <p class="form-error" ${error ? "" : "hidden"}>${error}</p>
           <button class="button primary full" type="submit"><i data-lucide="lock-keyhole"></i>Open inbox</button>
         </form>
-        <p class="footnote">Local starter key: <code>annote-local</code></p>
+        <p class="footnote">${window.location.port === "5173" ? "Local starter key: <code>annote-local</code>" : "Your dashboard key is stored only for this browser session."}</p>
       </section>
     </main>`;
   iconify();
