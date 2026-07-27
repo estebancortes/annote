@@ -9,6 +9,12 @@ let activeProject: Project | null = null;
 let activeProjectId = sessionStorage.getItem("annote-active-project") || "";
 type DashboardView = "feedback" | "setup";
 
+class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
 function iconify() {
   createIcons({ icons: { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Plus, RotateCcw, Settings2, X }, attrs: { "stroke-width": 2 } });
 }
@@ -19,7 +25,7 @@ async function request<T>(pathname: string, init: RequestInit = {}) {
     headers: { "X-Annote-Admin-Key": dashboardKey, ...(init.headers || {}) },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Something went wrong.");
+  if (!response.ok) throw new ApiError(data.error || "Something went wrong.", response.status);
   return data as T;
 }
 
@@ -239,8 +245,10 @@ async function loadDashboard() {
     const annotations = await request<Annotation[]>(`/api/projects/${activeProject.id}/annotations`);
     renderDashboard(activeProject, projects, annotations);
   } catch (caught) {
-    sessionStorage.removeItem("annote-dashboard-key");
-    dashboardKey = "";
+    if (caught instanceof ApiError && caught.status === 401) {
+      sessionStorage.removeItem("annote-dashboard-key");
+      dashboardKey = "";
+    }
     showUnlock(caught instanceof Error ? caught.message : "Could not open the feedback inbox.");
   }
 }
