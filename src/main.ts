@@ -1,4 +1,4 @@
-import { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Plus, RotateCcw, Settings2, X, createIcons } from "lucide";
+import { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Pencil, Plus, RotateCcw, Settings2, X, createIcons } from "lucide";
 import type { Annotation, Project } from "./types";
 import "./style.css";
 
@@ -16,7 +16,7 @@ class ApiError extends Error {
 }
 
 function iconify() {
-  createIcons({ icons: { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Plus, RotateCcw, Settings2, X }, attrs: { "stroke-width": 2 } });
+  createIcons({ icons: { Check, Clipboard, ExternalLink, KeyRound, LockKeyhole, MessageSquare, Pencil, Plus, RotateCcw, Settings2, X }, attrs: { "stroke-width": 2 } });
 }
 
 async function request<T>(pathname: string, init: RequestInit = {}) {
@@ -91,7 +91,7 @@ function renderDashboard(project: Project, projects: Project[], annotations: Ann
       <main class="workspace">
         <header class="topbar">
           <div class="project-heading"><p class="eyebrow">Client review</p><label class="project-select" for="project-selector"><span>Project</span><select id="project-selector">${projects.map((entry) => `<option value="${escapeHtml(entry.id)}" ${entry.id === project.id ? "selected" : ""}>${escapeHtml(entry.name)}</option>`).join("")}</select></label></div>
-          <div class="top-actions"><button class="button secondary icon-text" id="new-project"><i data-lucide="plus"></i>New project</button>${view === "feedback" ? '<a class="button secondary icon-text" href="/demo.html" target="_blank"><i data-lucide="external-link"></i>Open preview</a>' : '<button class="button primary icon-text" id="copy-snippet"><i data-lucide="clipboard"></i>Copy install</button>'}</div>
+          <div class="top-actions"><button class="icon-action" id="edit-project" title="Project settings" aria-label="Project settings"><i data-lucide="pencil"></i></button><button class="button secondary icon-text" id="new-project"><i data-lucide="plus"></i>New project</button>${view === "feedback" ? '<a class="button secondary icon-text" href="/demo.html" target="_blank"><i data-lucide="external-link"></i>Open preview</a>' : '<button class="button primary icon-text" id="copy-snippet"><i data-lucide="clipboard"></i>Copy install</button>'}</div>
         </header>
         <section class="review-strip" aria-label="Review access">
           <div><span class="strip-label">Review ID</span><code>${project.id}</code></div>
@@ -101,6 +101,7 @@ function renderDashboard(project: Project, projects: Project[], annotations: Ann
         ${view === "feedback" ? renderFeedbackView(annotations, open, resolved) : renderSetupView(project)}
       </main>
       ${renderCreateProjectDialog()}
+      ${renderProjectSettingsDialog(project)}
     </div>`;
   iconify();
   app.querySelector<HTMLButtonElement>("#copy-snippet")?.addEventListener("click", () => copySnippet(project));
@@ -110,7 +111,9 @@ function renderDashboard(project: Project, projects: Project[], annotations: Ann
     loadDashboard();
   });
   app.querySelector<HTMLButtonElement>("#new-project")!.addEventListener("click", openCreateProjectDialog);
+  app.querySelector<HTMLButtonElement>("#edit-project")!.addEventListener("click", openProjectSettingsDialog);
   bindCreateProjectDialog();
+  bindProjectSettingsDialog(project);
   app.querySelectorAll<HTMLButtonElement>("[data-status]").forEach((button) => button.addEventListener("click", () => updateStatus(button.dataset.id!, button.dataset.status as Annotation["status"])));
 }
 
@@ -145,6 +148,19 @@ function renderCreateProjectDialog() {
       <label for="project-origins">Allowed website origins<textarea id="project-origins" name="origins" rows="3" required placeholder="https://preview.acme.com&#10;https://staging.acme.com"></textarea><span class="field-hint">One exact origin per line. Include the protocol, without a path.</span></label>
       <p class="form-error" id="project-form-error" hidden></p>
       <div class="dialog-actions"><button class="button secondary" type="button" id="cancel-project-dialog">Cancel</button><button class="button primary icon-text" type="submit"><i data-lucide="plus"></i>Create project</button></div>
+    </form>
+  </dialog>`;
+}
+
+function renderProjectSettingsDialog(project: Project) {
+  return `<dialog class="project-dialog" id="project-settings-dialog" aria-labelledby="project-settings-title">
+    <form id="project-settings-form">
+      <div class="dialog-head"><div><p class="eyebrow">Project settings</p><h2 id="project-settings-title">Edit ${escapeHtml(project.name)}</h2></div><button class="icon-action" type="button" id="close-project-settings" aria-label="Close" title="Close"><i data-lucide="x"></i></button></div>
+      <label for="settings-project-id">Review ID<input id="settings-project-id" value="${escapeHtml(project.id)}" readonly /></label>
+      <div class="form-grid"><label for="settings-project-name">Project name<input id="settings-project-name" name="name" maxlength="120" required value="${escapeHtml(project.name)}" /></label><label for="settings-project-code">New review code<input id="settings-project-code" name="reviewCode" type="password" minlength="8" maxlength="120" autocomplete="new-password" placeholder="Leave blank to keep current" /></label></div>
+      <label for="settings-project-origins">Allowed website origins<textarea id="settings-project-origins" name="origins" rows="3" required>${escapeHtml(project.allowedOrigins.join("\n"))}</textarea><span class="field-hint">One exact origin per line. Include the protocol, without a path.</span></label>
+      <p class="form-error" id="project-settings-error" hidden></p>
+      <div class="dialog-actions"><button class="button secondary" type="button" id="cancel-project-settings">Cancel</button><button class="button primary icon-text" type="submit"><i data-lucide="check"></i>Save changes</button></div>
     </form>
   </dialog>`;
 }
@@ -191,6 +207,37 @@ function bindCreateProjectDialog() {
       else window.location.hash = "#setup";
     } catch (caught) {
       error.textContent = caught instanceof Error ? caught.message : "Could not create this project.";
+      error.hidden = false;
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function openProjectSettingsDialog() {
+  app.querySelector<HTMLDialogElement>("#project-settings-dialog")!.showModal();
+}
+
+function bindProjectSettingsDialog(project: Project) {
+  const dialog = app.querySelector<HTMLDialogElement>("#project-settings-dialog")!;
+  const form = app.querySelector<HTMLFormElement>("#project-settings-form")!;
+  const close = () => dialog.close();
+  app.querySelector<HTMLButtonElement>("#close-project-settings")!.addEventListener("click", close);
+  app.querySelector<HTMLButtonElement>("#cancel-project-settings")!.addEventListener("click", close);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const error = app.querySelector<HTMLElement>("#project-settings-error")!;
+    const submit = form.querySelector<HTMLButtonElement>("button[type='submit']")!;
+    const values = new FormData(form);
+    const allowedOrigins = String(values.get("origins") || "").split(/\n|,/).map((origin) => origin.trim()).filter(Boolean);
+    error.hidden = true;
+    submit.disabled = true;
+    try {
+      await request<Project>(`/api/projects/${project.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: values.get("name"), reviewCode: values.get("reviewCode"), allowedOrigins }) });
+      dialog.close();
+      await loadDashboard();
+    } catch (caught) {
+      error.textContent = caught instanceof Error ? caught.message : "Could not update this project.";
       error.hidden = false;
     } finally {
       submit.disabled = false;

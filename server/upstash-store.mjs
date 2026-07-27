@@ -49,7 +49,7 @@ export function createUpstashStore() {
 
   async function annotationsFor(projectId, newestFirst) {
     const ids = await annotationIds(projectId, newestFirst);
-    const entries = await Promise.all(ids.map((id) => redis.get(annotationKey(id))));
+    const entries = await Promise.all(ids.map((id) => command("GET", annotationKey(id))));
     return entries.map(parse).filter(Boolean);
   }
 
@@ -72,6 +72,10 @@ export function createUpstashStore() {
         command("SET", projectKey(project.id), JSON.stringify(project)),
         command("ZADD", `${prefix}projects`, new Date(project.createdAt).getTime(), project.id),
       ]);
+      return project;
+    },
+    async updateProject(project) {
+      await command("SET", projectKey(project.id), JSON.stringify(project));
       return project;
     },
     async listAnnotations(projectId, openOnly = false) {

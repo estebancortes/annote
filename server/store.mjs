@@ -101,6 +101,7 @@ export function createStore({ databasePath, legacyDataPath }) {
   const listOpenAnnotations = database.prepare("SELECT * FROM annotations WHERE project_id = ? AND status = 'open' ORDER BY created_at ASC");
   const getAnnotation = database.prepare("SELECT * FROM annotations WHERE id = ?");
   const insertProject = database.prepare("INSERT INTO projects (id, name, review_code_hash, allowed_origins, created_at) VALUES (?, ?, ?, ?, ?)");
+  const updateProject = database.prepare("UPDATE projects SET name = ?, review_code_hash = ?, allowed_origins = ? WHERE id = ?");
   const insertAnnotation = database.prepare("INSERT INTO annotations (id, project_id, comment, anchor, page, status, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?)");
   const updateAnnotation = database.prepare("UPDATE annotations SET status = ?, updated_at = ? WHERE id = ?");
   const sessions = new Map();
@@ -117,6 +118,10 @@ export function createStore({ databasePath, legacyDataPath }) {
     },
     createProject(project) {
       insertProject.run(project.id, project.name, project.reviewCodeHash, JSON.stringify(project.allowedOrigins), project.createdAt);
+      return this.findProject(project.id);
+    },
+    updateProject(project) {
+      if (updateProject.run(project.name, project.reviewCodeHash, JSON.stringify(project.allowedOrigins), project.id).changes === 0) return null;
       return this.findProject(project.id);
     },
     createAnnotation(annotation) {

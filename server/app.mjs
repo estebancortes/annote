@@ -31,6 +31,26 @@ function projectInput(body) {
   return { project: { id, name, reviewCodeHash: hash(reviewCode), allowedOrigins, createdAt: new Date().toISOString() } };
 }
 
+function projectUpdateInput(body, project) {
+  const name = String(body?.name || "").trim();
+  const reviewCode = String(body?.reviewCode || "");
+  const candidateOrigins = Array.isArray(body?.allowedOrigins) ? body.allowedOrigins : [];
+  if (name.length < 2 || name.length > 120) return { error: "Project names need between 2 and 120 characters." };
+  if (reviewCode && (reviewCode.length < 8 || reviewCode.length > 120)) return { error: "New review codes need between 8 and 120 characters." };
+
+  const allowedOrigins = [...new Set(candidateOrigins.map((origin) => String(origin).trim()).filter(Boolean))];
+  if (!allowedOrigins.length) return { error: "Add at least one client site origin." };
+  for (const origin of allowedOrigins) {
+    try {
+      const parsed = new URL(origin);
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== origin) throw new Error();
+    } catch {
+      return { error: `Use a full origin such as https://preview.example.com. Invalid origin: ${origin}` };
+    }
+  }
+  return { project: { ...project, name, allowedOrigins, ...(reviewCode ? { reviewCodeHash: hash(reviewCode) } : {}) } };
+}
+
 export function createApiApp({ store, adminKey }) {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
@@ -74,6 +94,16 @@ export function createApiApp({ store, adminKey }) {
     const project = await store.createProject(result.project);
     const { reviewCodeHash, ...safeProject } = project;
     response.status(201).json(safeProject);
+  });
+
+  app.patch("/api/projects/:projectId", requireAdmin, async (request, response) => {
+    const currentProject = await store.findProject(request.params.projectId);
+    if (!currentProject) return response.status(404).json({ error: "Project not found." });
+    const result = projectUpdateInput(request.body, currentProject);
+    if (result.error) return response.status(400).json({ error: result.error });
+    const project = await store.updateProject(result.project);
+    const { reviewCodeHash, ...safeProject } = project;
+    response.json(safeProject);
   });
 
   app.post("/api/reviews/:reviewId/unlock", async (request, response) => {
