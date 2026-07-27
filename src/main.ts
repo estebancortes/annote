@@ -24,8 +24,17 @@ async function request<T>(pathname: string, init: RequestInit = {}) {
     ...init,
     headers: { "X-Annote-Admin-Key": dashboardKey, ...(init.headers || {}) },
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ApiError(data.error || "Something went wrong.", response.status);
+  const responseText = await response.text();
+  const data = (() => {
+    try {
+      return responseText ? JSON.parse(responseText) : {};
+    } catch {
+      return {};
+    }
+  })();
+  if (!response.ok) {
+    throw new ApiError(data.error || `The server returned ${response.status}${responseText ? `: ${responseText.slice(0, 160)}` : "."}`, response.status);
+  }
   return data as T;
 }
 

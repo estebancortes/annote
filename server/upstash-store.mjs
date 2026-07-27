@@ -1,5 +1,3 @@
-import { Redis } from "@upstash/redis";
-
 const prefix = "annote:v1:";
 
 function projectKey(id) {
@@ -21,15 +19,32 @@ function parse(value) {
 }
 
 export function createUpstashStore() {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const url = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").replace(/\/$/, "");
   const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   if (!url || !token) {
     throw new Error("Upstash Redis is not configured. Connect the Upstash integration and ensure its Redis variables are available in the Production environment.");
   }
-  const redis = new Redis({ url, token });
+
+  async function command(...args) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(args),
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || body?.error) {
+      const detail = body?.error || body?.message || `HTTP ${response.status}`;
+      throw new Error(`Upstash Redis request failed: ${detail}`);
+    }
+    return body?.result;
+  }
 
   async function annotationIds(projectId, newestFirst) {
-    return redis.zrange(annotationIndexKey(projectId), 0, -1, newestFirst ? { rev: true } : undefined);
+    const ids = await command("ZRANGE", annotationIndexKey(projectId), 0, -1, ...(newestFirst ? ["REV"] : []));
+    return Array.isArray(ids) ? ids : [];
   }
 
   async function annotationsFor(projectId, newestFirst) {
@@ -40,11 +55,11 @@ export function createUpstashStore() {
 
   return {
     async findProject(id) {
-      return parse(await redis.get(projectKey(id)));
+      return parse(await command("GET", projectKey(id)));
     },
     async listProjects() {
-      const ids = await redis.zrange(`${prefix}projects`, 0, -1, { rev: true });
-      const entries = await Promise.all(ids.map((id) => redis.get(projectKey(id))));
+      const ids = await command("ZRANGE", `${prefix}projects`, 0, -1, "REV");
+      const entries = await Promise.all((Array.isArray(ids) ? ids : []).map((id) => command("GET", projectKey(id))));
       return Promise.all(entries.map(async (entry) => {
         const project = parse(entry);
         if (!project) return null;
@@ -54,8 +69,8 @@ export function createUpstashStore() {
     },
     async createProject(project) {
       await Promise.all([
-        redis.set(projectKey(project.id), JSON.stringify(project)),
-        redis.zadd(`${prefix}projects`, { score: new Date(project.createdAt).getTime(), member: project.id }),
+        command("SET", projectKey(project.id), JSON.stringify(project)),
+        command("ZADD", `${prefix}projects`, new Date(project.createdAt).getTime(), project.id),
       ]);
       return project;
     },
@@ -65,23 +80,23 @@ export function createUpstashStore() {
     },
     async createAnnotation(annotation) {
       await Promise.all([
-        redis.set(annotationKey(annotation.id), JSON.stringify(annotation)),
-        redis.zadd(annotationIndexKey(annotation.projectId), { score: new Date(annotation.createdAt).getTime(), member: annotation.id }),
+        command("SET", annotationKey(annotation.id), JSON.stringify(annotation)),
+        command("ZADD", annotationIndexKey(annotation.projectId), new Date(annotation.createdAt).getTime(), annotation.id),
       ]);
       return annotation;
     },
     async updateAnnotation(id, status, updatedAt) {
-      const annotation = parse(await redis.get(annotationKey(id)));
+      const annotation = parse(await command("GET", annotationKey(id)));
       if (!annotation) return null;
       const updated = { ...annotation, status, updatedAt };
-      await redis.set(annotationKey(id), JSON.stringify(updated));
+      await command("SET", annotationKey(id), JSON.stringify(updated));
       return updated;
     },
     async createSession(token, session, ttlSeconds) {
-      await redis.set(`${prefix}session:${token}`, JSON.stringify(session), { ex: ttlSeconds });
+      await command("SET", `${prefix}session:${token}`, JSON.stringify(session), "EX", ttlSeconds);
     },
     async findSession(token) {
-      return parse(await redis.get(`${prefix}session:${token}`));
+      return parse(await command("GET", `${prefix}session:${token}`));
     },
   };
 }
