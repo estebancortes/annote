@@ -162,8 +162,9 @@ class AnnoteWidget {
         .review-title { display: flex; align-items: center; gap: 8px; }
         .review-title h2 { font-size: 16px; }
         .panel-count { display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 5px; border-radius: 12px; background: #edf3ef; color: #52625c; font-size: 11px; font-weight: 800; }
-        .tool-dock { position: fixed; top: 120px; right: 432px; display: grid; gap: 4px; width: 50px; padding: 6px; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(23,33,31,.14); pointer-events: auto; }
-        .tool-dock::after { content: ""; height: 1px; margin: 3px 4px; background: #e2e8e4; }
+        .tool-dock { position: fixed; top: 120px; right: 432px; display: grid; gap: 4px; width: 50px; padding: 6px; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(23,33,31,.14); pointer-events: auto; transition: top .16s ease, right .16s ease, bottom .16s ease; }
+        .tool-dock.is-collapsed { top: auto; right: 22px; bottom: 22px; transform: none !important; }
+        .tool-divider { height: 1px; margin: 3px 4px; background: #e2e8e4; }
         .tool-button { position: relative; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 5px; background: transparent; color: #53645f; }
         .tool-button:hover { background: #eaf5f0; color: #008f7a; }
         .tool-button.primary { background: #008f7a; color: #fff; box-shadow: 0 4px 10px rgba(0,143,122,.22); }
@@ -238,6 +239,8 @@ class AnnoteWidget {
           <button class="tool-button" data-action="rectangle" data-tooltip="Rectangle" aria-label="Rectangle"><i data-lucide="square"></i></button>
           <button class="tool-button" data-action="circle" data-tooltip="Circle" aria-label="Circle"><i data-lucide="circle"></i></button>
           <button class="tool-button" data-action="freehand" data-tooltip="Freehand" aria-label="Freehand"><i data-lucide="pen-tool"></i></button>
+          <span class="tool-divider"></span>
+          <button class="tool-button" data-action="open-review" data-tooltip="Show feedback" aria-label="Show feedback"><i data-lucide="message-square"></i></button>
         </aside>
         <section class="review-panel" hidden aria-label="Your feedback">
           <header class="review-header"><div><p class="eyebrow">Client review</p><div class="review-title"><h2>Feedback</h2><span class="panel-count">0</span></div></div><button class="icon-button" data-action="close-review" aria-label="Close feedback panel" title="Close"><i data-lucide="x"></i></button></header>
@@ -289,6 +292,7 @@ class AnnoteWidget {
     this.root.querySelectorAll<HTMLButtonElement>("[data-action='rectangle']").forEach((button) => button.addEventListener("click", () => this.startDrawing("rectangle")));
     this.root.querySelectorAll<HTMLButtonElement>("[data-action='circle']").forEach((button) => button.addEventListener("click", () => this.startDrawing("circle")));
     this.root.querySelectorAll<HTMLButtonElement>("[data-action='freehand']").forEach((button) => button.addEventListener("click", () => this.startDrawing("freehand")));
+    this.element<HTMLButtonElement>("[data-action='open-review']").addEventListener("click", () => this.showReviewPanel());
     this.element<HTMLButtonElement>("[data-action='close-review']").addEventListener("click", () => this.hideReviewPanel());
     this.element<HTMLElement>(".review-header").addEventListener("pointerdown", (event) => this.startPanelDrag(event));
     this.element<HTMLInputElement>("[data-review-search]").addEventListener("input", (event) => {
@@ -561,6 +565,7 @@ class AnnoteWidget {
     target.textContent = anchor.text ? `${anchor.label}: ${anchor.text}` : `Selected ${anchor.label}`;
     textarea.value = editing?.comment || "";
     this.hideReviewPanel();
+    this.element<HTMLElement>(".tool-dock").hidden = true;
     this.element<HTMLButtonElement>("[data-action='launcher']").hidden = true;
     composer.hidden = false;
     window.setTimeout(() => textarea.focus(), 0);
@@ -589,14 +594,21 @@ class AnnoteWidget {
     if (!this.token) return;
     this.renderReviewPanel();
     this.element<HTMLElement>(".review-panel").hidden = false;
-    this.element<HTMLElement>(".tool-dock").hidden = false;
+    const dock = this.element<HTMLElement>(".tool-dock");
+    dock.hidden = false;
+    dock.classList.remove("is-collapsed");
+    dock.style.transform = `translate(${this.panelOffset.x}px, ${this.panelOffset.y}px)`;
     this.element<HTMLButtonElement>("[data-action='launcher']").hidden = true;
   }
 
   private hideReviewPanel() {
     this.element<HTMLElement>(".review-panel").hidden = true;
-    this.element<HTMLElement>(".tool-dock").hidden = true;
-    this.element<HTMLButtonElement>("[data-action='launcher']").hidden = false;
+    if (this.token) {
+      const dock = this.element<HTMLElement>(".tool-dock");
+      dock.hidden = false;
+      dock.classList.add("is-collapsed");
+    }
+    this.element<HTMLButtonElement>("[data-action='launcher']").hidden = Boolean(this.token);
   }
 
   private toggleReviewPanel() {
