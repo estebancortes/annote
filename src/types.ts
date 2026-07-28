@@ -1,4 +1,14 @@
 export type AnnotationStatus = "open" | "resolved";
+export type AnnotationKind = "element" | "text" | "pin" | "rectangle" | "circle" | "freehand";
+
+export interface AnnotationGeometry {
+  type: "rectangle" | "circle" | "freehand";
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  points?: Array<{ x: number; y: number }>;
+}
 
 export interface Annotation {
   id: string;
@@ -12,8 +22,9 @@ export interface Annotation {
     label: string;
     text: string;
     position: { x: number; y: number };
-    kind?: "element" | "text";
+    kind?: AnnotationKind;
     quote?: string;
+    geometry?: AnnotationGeometry;
   };
   page: {
     url: string;

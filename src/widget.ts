@@ -1,5 +1,5 @@
-import { Check, Crosshair, Highlighter, LockKeyhole, MessageSquare, MousePointer2, Pencil, Send, Trash2, X, createElement } from "lucide";
-import type { Annotation } from "./types";
+import { Check, Circle, Crosshair, Highlighter, LockKeyhole, MessageSquare, MousePointer2, Pencil, PenTool, Send, Square, Trash2, X, createElement } from "lucide";
+import type { Annotation, AnnotationGeometry, AnnotationKind } from "./types";
 
 export interface AnnoteOptions {
   reviewId: string;
@@ -13,8 +13,9 @@ interface SelectedTarget {
   label: string;
   text: string;
   position: { x: number; y: number };
-  kind: "element" | "text";
+  kind: AnnotationKind;
   quote?: string;
+  geometry?: AnnotationGeometry;
 }
 
 function escapeSelector(value: string) {
@@ -95,9 +96,15 @@ class AnnoteWidget {
   private token = "";
   private picking = false;
   private selectingText = false;
+  private drawingTool: AnnotationGeometry["type"] | null = null;
+  private drawingStart: { x: number; y: number } | null = null;
+  private draftGeometry: AnnotationGeometry | null = null;
+  private panelDrag: { startX: number; startY: number; offsetX: number; offsetY: number } | null = null;
+  private panelOffset = { x: 0, y: 0 };
   private selected: SelectedTarget | null = null;
   private editingAnnotation: Annotation | null = null;
   private annotations: Annotation[] = [];
+  private reviewQuery = "";
   private readonly highlightName: string;
 
   constructor(private readonly options: AnnoteOptions) {
@@ -148,8 +155,9 @@ class AnnoteWidget {
         .error { color: #b42318; }
         .notice { display: flex; align-items: center; gap: 10px; color: #245c4f; font-size: 13px; font-weight: 700; }
         .notice svg { width: 18px; height: 18px; color: #008f7a; flex: 0 0 auto; }
-        .review-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(378px, calc(100vw - 24px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border-left: 1px solid #c7d1ca; background: #fff; box-shadow: -16px 0 42px rgba(23,33,31,.14); pointer-events: auto; }
-        .review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 20px 17px; border-bottom: 1px solid #dce4df; }
+        .review-panel { position: fixed; top: 72px; right: 22px; width: min(378px, calc(100vw - 32px)); max-height: calc(100vh - 94px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border: 1px solid #c7d1ca; border-radius: 7px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; overflow: hidden; }
+        .review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 20px 17px; border-bottom: 1px solid #dce4df; cursor: grab; user-select: none; }
+        .review-header:active { cursor: grabbing; }
         .eyebrow { margin: 0 0 5px; color: #008f7a; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
         .review-title { display: flex; align-items: center; gap: 8px; }
         .review-title h2 { font-size: 17px; }
@@ -159,7 +167,10 @@ class AnnoteWidget {
         .review-action:hover { border-color: #008f7a; color: #006e5e; background: #f4faf7; }
         .review-action.primary { border-color: #008f7a; background: #008f7a; color: #fff; }
         .review-action.primary:hover { background: #007764; color: #fff; }
+        .review-action.ink { grid-column: span 2; }
         .review-action svg { width: 15px; height: 15px; }
+        .review-search { padding: 12px 20px; border-bottom: 1px solid #dce4df; }
+        .review-search input { height: 36px; padding: 0 10px; font-size: 12px; }
         .feedback-list { display: grid; align-content: start; gap: 1px; min-height: 0; overflow: auto; }
         .feedback-entry { display: grid; grid-template-columns: 24px minmax(0, 1fr) 28px 28px; gap: 9px; align-items: start; padding: 15px 20px; border-bottom: 1px solid #e2e8e4; }
         .feedback-entry:last-child { border-bottom: 0; }
@@ -174,7 +185,10 @@ class AnnoteWidget {
         .feedback-empty { margin: 0; padding: 24px 20px; color: #718078; font-size: 12px; line-height: 1.45; }
         .review-footer { display: flex; align-items: center; gap: 7px; padding: 13px 20px; border-top: 1px solid #dce4df; color: #718078; font-size: 11px; line-height: 1.35; }
         .review-footer svg { width: 14px; height: 14px; color: #008f7a; flex: 0 0 auto; }
-        .composer { top: 0; right: 0; bottom: 0; width: min(378px, calc(100vw - 24px)); padding: 22px 20px; border: 0; border-left: 1px solid #c7d1ca; border-radius: 0; box-shadow: -16px 0 42px rgba(23,33,31,.14); }
+        .composer { top: 72px; right: 22px; bottom: auto; width: min(378px, calc(100vw - 32px)); padding: 22px 20px; }
+        .visual-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
+        .visual-shape { fill: rgba(0, 143, 122, .08); stroke: #008f7a; stroke-width: 3; vector-effect: non-scaling-stroke; }
+        .visual-ink { fill: none; stroke: #008f7a; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
         .marker { position: fixed; width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; background: #ef6b50; color: #fff; box-shadow: 0 5px 12px rgba(104,36,21,.28); font-size: 12px; font-weight: 800; pointer-events: auto; }
         .marker:hover { transform: scale(1.08); }
         .marker-card { position: fixed; width: min(300px, calc(100vw - 32px)); padding: 14px; border: 1px solid #c7d1ca; border-radius: 7px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; }
@@ -186,7 +200,7 @@ class AnnoteWidget {
         @media (max-width: 560px) {
           .launcher { right: 16px; bottom: 16px; }
           .unlock, .notice { right: 16px; bottom: 74px; }
-          .review-panel, .composer { width: 100vw; }
+          .review-panel, .composer { top: 0; right: 0; width: 100vw; max-height: 100vh; border-radius: 0; }
           .review-header { padding-top: max(20px, env(safe-area-inset-top)); }
         }
       </style>
@@ -206,12 +220,14 @@ class AnnoteWidget {
         </section>
         <section class="review-panel" hidden aria-label="Your feedback">
           <header class="review-header"><div><p class="eyebrow">Client review</p><div class="review-title"><h2>Feedback</h2><span class="panel-count">0</span></div></div><button class="icon-button" data-action="close-review" aria-label="Close feedback panel" title="Close"><i data-lucide="x"></i></button></header>
-          <div class="review-actions"><button class="review-action primary" data-action="add-point"><i data-lucide="mouse-pointer-2"></i>Add point</button><button class="review-action" data-action="highlight"><i data-lucide="highlighter"></i>Highlight text</button></div>
+          <div class="review-actions"><button class="review-action primary" data-action="add-point"><i data-lucide="mouse-pointer-2"></i>Pin note</button><button class="review-action" data-action="highlight"><i data-lucide="highlighter"></i>Highlight</button><button class="review-action" data-action="rectangle"><i data-lucide="square"></i>Rectangle</button><button class="review-action" data-action="circle"><i data-lucide="circle"></i>Circle</button><button class="review-action ink" data-action="freehand"><i data-lucide="pen-tool"></i>Freehand</button></div>
+          <div class="review-search"><input type="search" data-review-search placeholder="Search feedback" aria-label="Search feedback" /></div>
           <div class="feedback-list"></div>
           <footer class="review-footer"><i data-lucide="check"></i><span>Your notes are shared with the project team.</span></footer>
         </section>
         <aside class="notice" hidden><i data-lucide="check"></i><span>Feedback sent</span></aside>
         <aside class="marker-card" hidden></aside>
+        <svg class="visual-layer" aria-hidden="true"></svg>
         <div class="markers"></div>
       </div>
     `;
@@ -228,7 +244,7 @@ class AnnoteWidget {
   }
 
   private renderIcons() {
-    const icons = { check: Check, crosshair: Crosshair, highlighter: Highlighter, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, "mouse-pointer-2": MousePointer2, pencil: Pencil, send: Send, "trash-2": Trash2, x: X };
+    const icons = { check: Check, circle: Circle, crosshair: Crosshair, highlighter: Highlighter, "lock-keyhole": LockKeyhole, "message-square": MessageSquare, "mouse-pointer-2": MousePointer2, pencil: Pencil, "pen-tool": PenTool, send: Send, square: Square, "trash-2": Trash2, x: X };
     this.root.querySelectorAll<HTMLElement>("i[data-lucide]").forEach((placeholder) => {
       const icon = icons[placeholder.dataset.lucide as keyof typeof icons];
       if (!icon) return;
@@ -249,7 +265,15 @@ class AnnoteWidget {
     });
     this.element<HTMLButtonElement>("[data-action='add-point']").addEventListener("click", () => this.startPicking());
     this.element<HTMLButtonElement>("[data-action='highlight']").addEventListener("click", () => this.startTextSelecting());
+    this.element<HTMLButtonElement>("[data-action='rectangle']").addEventListener("click", () => this.startDrawing("rectangle"));
+    this.element<HTMLButtonElement>("[data-action='circle']").addEventListener("click", () => this.startDrawing("circle"));
+    this.element<HTMLButtonElement>("[data-action='freehand']").addEventListener("click", () => this.startDrawing("freehand"));
     this.element<HTMLButtonElement>("[data-action='close-review']").addEventListener("click", () => this.hideReviewPanel());
+    this.element<HTMLElement>(".review-header").addEventListener("pointerdown", (event) => this.startPanelDrag(event));
+    this.element<HTMLInputElement>("[data-review-search]").addEventListener("input", (event) => {
+      this.reviewQuery = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase();
+      this.renderReviewPanel();
+    });
     this.root.querySelectorAll("[data-action='close-unlock']").forEach((button) => button.addEventListener("click", () => this.hideUnlock()));
     this.root.querySelectorAll("[data-action='cancel-comment']").forEach((button) => button.addEventListener("click", () => this.cancelComment()));
     this.element<HTMLFormElement>("[data-form='unlock']").addEventListener("submit", (event) => this.unlock(event));
@@ -257,11 +281,23 @@ class AnnoteWidget {
     window.addEventListener("scroll", () => this.renderMarkers(), { passive: true });
     window.addEventListener("resize", () => this.renderMarkers());
     document.addEventListener("keydown", (event) => {
+      const editable = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target as HTMLElement | null)?.isContentEditable;
+      if (editable || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "Escape") {
         if (this.picking) this.stopPicking();
         else if (this.selectingText) this.stopTextSelecting();
+        else if (this.drawingTool) this.stopDrawing();
         else this.cancelComment();
+        return;
       }
+      if (!this.token) return;
+      const key = event.key.toLowerCase();
+      if (key === "a") this.toggleReviewPanel();
+      if (key === "p") this.startPicking();
+      if (key === "h") this.startTextSelecting();
+      if (key === "r") this.startDrawing("rectangle");
+      if (key === "c") this.startDrawing("circle");
+      if (key === "d") this.startDrawing("freehand");
     });
   }
 
@@ -335,6 +371,115 @@ class AnnoteWidget {
     this.element<HTMLElement>(".pick-banner").hidden = true;
     document.removeEventListener("pointerup", this.pickText, true);
   }
+
+  private startDrawing(type: AnnotationGeometry["type"]) {
+    this.cancelComment(false);
+    this.hideReviewPanel();
+    this.stopPicking();
+    this.stopTextSelecting();
+    this.drawingTool = type;
+    const banner = this.element<HTMLElement>(".pick-banner");
+    banner.querySelector("span")!.textContent = type === "freehand" ? "Draw directly on the page, then release" : "Drag over the area you want to discuss";
+    banner.hidden = false;
+    document.addEventListener("pointerdown", this.beginDrawing, true);
+  }
+
+  private stopDrawing() {
+    this.drawingTool = null;
+    this.drawingStart = null;
+    this.draftGeometry = null;
+    this.element<HTMLElement>(".pick-banner").hidden = true;
+    document.removeEventListener("pointerdown", this.beginDrawing, true);
+    document.removeEventListener("pointermove", this.updateDrawing, true);
+    document.removeEventListener("pointerup", this.finishDrawing, true);
+    this.renderVisuals();
+  }
+
+  private drawingPoint(event: PointerEvent) {
+    return { x: Math.round(event.clientX + window.scrollX), y: Math.round(event.clientY + window.scrollY) };
+  }
+
+  private beginDrawing = (event: PointerEvent) => {
+    if (!this.drawingTool || this.host.contains(event.target as Node)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = this.drawingPoint(event);
+    this.drawingStart = point;
+    this.draftGeometry = this.drawingTool === "freehand"
+      ? { type: "freehand", x: point.x, y: point.y, points: [point] }
+      : { type: this.drawingTool, x: point.x, y: point.y, width: 0, height: 0 };
+    document.removeEventListener("pointerdown", this.beginDrawing, true);
+    document.addEventListener("pointermove", this.updateDrawing, true);
+    document.addEventListener("pointerup", this.finishDrawing, true);
+    this.renderVisuals();
+  };
+
+  private updateDrawing = (event: PointerEvent) => {
+    if (!this.drawingTool || !this.drawingStart || !this.draftGeometry) return;
+    event.preventDefault();
+    const point = this.drawingPoint(event);
+    if (this.draftGeometry.type === "freehand") {
+      const points = this.draftGeometry.points || [];
+      const previous = points.at(-1);
+      if (!previous || Math.hypot(point.x - previous.x, point.y - previous.y) > 2) points.push(point);
+    } else {
+      this.draftGeometry.width = point.x - this.drawingStart.x;
+      this.draftGeometry.height = point.y - this.drawingStart.y;
+    }
+    this.renderVisuals();
+  };
+
+  private finishDrawing = (event: PointerEvent) => {
+    if (!this.drawingTool || !this.draftGeometry) return;
+    this.updateDrawing(event);
+    const geometry = this.draftGeometry;
+    const kind = geometry.type === "freehand" ? "freehand" : geometry.type;
+    const meaningful = geometry.type === "freehand"
+      ? (geometry.points?.length || 0) > 2
+      : Math.abs(geometry.width || 0) > 8 && Math.abs(geometry.height || 0) > 8;
+    if (meaningful) {
+      this.selected = {
+        element: document.body,
+        selector: "body",
+        label: geometry.type === "freehand" ? "Freehand mark" : geometry.type === "circle" ? "Circle" : "Rectangle",
+        text: "Visual annotation",
+        position: { x: geometry.x, y: geometry.y },
+        kind,
+        geometry,
+      };
+    }
+    this.stopDrawing();
+    if (meaningful) this.openComposer();
+    else this.showReviewPanel();
+  };
+
+  private startPanelDrag(event: PointerEvent) {
+    if (window.innerWidth <= 560 || (event.target as Element).closest("button")) return;
+    const panel = this.element<HTMLElement>(".review-panel");
+    this.panelDrag = { startX: event.clientX, startY: event.clientY, offsetX: this.panelOffset.x, offsetY: this.panelOffset.y };
+    panel.setPointerCapture?.(event.pointerId);
+    document.addEventListener("pointermove", this.movePanel, true);
+    document.addEventListener("pointerup", this.stopPanelDrag, true);
+  }
+
+  private movePanel = (event: PointerEvent) => {
+    if (!this.panelDrag) return;
+    const panel = this.element<HTMLElement>(".review-panel");
+    const width = panel.offsetWidth;
+    const height = panel.offsetHeight;
+    const baseLeft = window.innerWidth - width - 22;
+    const baseTop = 72;
+    const nextLeft = Math.min(window.innerWidth - width - 8, Math.max(8, baseLeft + this.panelDrag.offsetX + event.clientX - this.panelDrag.startX));
+    const nextTop = Math.min(window.innerHeight - height - 8, Math.max(8, baseTop + this.panelDrag.offsetY + event.clientY - this.panelDrag.startY));
+    this.panelOffset = { x: nextLeft - baseLeft, y: nextTop - baseTop };
+    panel.style.transform = `translate(${this.panelOffset.x}px, ${this.panelOffset.y}px)`;
+  };
+
+  private stopPanelDrag = () => {
+    this.panelDrag = null;
+    document.removeEventListener("pointermove", this.movePanel, true);
+    document.removeEventListener("pointerup", this.stopPanelDrag, true);
+  };
 
   private highlightTarget = (event: PointerEvent) => {
     const target = event.target as Element | null;
@@ -437,9 +582,15 @@ class AnnoteWidget {
   private renderReviewPanel() {
     const list = this.element<HTMLElement>(".feedback-list");
     this.element<HTMLElement>(".panel-count").textContent = String(this.annotations.length);
-    list.innerHTML = this.annotations.length
-      ? this.annotations.map((annotation, index) => `<article class="feedback-entry"><span class="feedback-number">${index + 1}</span><button class="feedback-jump" data-action="jump-feedback" data-id="${annotation.id}"><span>${this.escapeHtml(annotation.comment)}</span><span class="feedback-context">${this.escapeHtml(annotation.anchor.kind === "text" ? annotation.anchor.quote || annotation.anchor.text : annotation.anchor.label)}</span></button><button class="feedback-edit" data-action="edit-feedback" data-id="${annotation.id}" aria-label="Edit feedback ${index + 1}" title="Edit feedback"><i data-lucide="pencil"></i></button><button class="feedback-delete" data-action="delete-feedback" data-id="${annotation.id}" aria-label="Delete feedback ${index + 1}" title="Delete feedback"><i data-lucide="trash-2"></i></button></article>`).join("")
-      : '<p class="feedback-empty">Add a point or highlight text to begin your review.</p>';
+    const search = this.element<HTMLInputElement>("[data-review-search]");
+    search.value = this.reviewQuery;
+    const visible = this.annotations.filter((annotation) => `${annotation.comment} ${annotation.anchor.label} ${annotation.anchor.text} ${annotation.anchor.quote || ""}`.toLowerCase().includes(this.reviewQuery));
+    list.innerHTML = visible.length
+      ? visible.map((annotation) => {
+        const index = this.annotations.indexOf(annotation) + 1;
+        return `<article class="feedback-entry"><span class="feedback-number">${index}</span><button class="feedback-jump" data-action="jump-feedback" data-id="${annotation.id}"><span>${this.escapeHtml(annotation.comment)}</span><span class="feedback-context">${this.escapeHtml(annotation.anchor.kind === "text" ? annotation.anchor.quote || annotation.anchor.text : annotation.anchor.label)}</span></button><button class="feedback-edit" data-action="edit-feedback" data-id="${annotation.id}" aria-label="Edit feedback ${index}" title="Edit feedback"><i data-lucide="pencil"></i></button><button class="feedback-delete" data-action="delete-feedback" data-id="${annotation.id}" aria-label="Delete feedback ${index}" title="Delete feedback"><i data-lucide="trash-2"></i></button></article>`;
+      }).join("")
+      : `<p class="feedback-empty">${this.reviewQuery ? "No feedback matches that search." : "Add a point, a visual mark, or a text highlight to begin your review."}</p>`;
     this.renderIcons();
     this.root.querySelectorAll<HTMLButtonElement>("[data-action='jump-feedback']").forEach((button) => button.addEventListener("click", () => {
       const annotation = this.annotations.find((entry) => entry.id === button.dataset.id);
@@ -456,6 +607,7 @@ class AnnoteWidget {
   }
 
   private focusFeedback(annotation: Annotation) {
+    history.replaceState(null, "", `#annote=${annotation.id}`);
     const anchored = document.querySelector(annotation.anchor.selector);
     anchored?.scrollIntoView({ behavior: "smooth", block: "center" });
     const marker = this.element<HTMLElement>(`[data-marker-id="${annotation.id}"]`);
@@ -507,6 +659,7 @@ class AnnoteWidget {
             position: selected!.position,
             kind: selected!.kind,
             ...(selected!.quote ? { quote: selected!.quote } : {}),
+            ...(selected!.geometry ? { geometry: selected!.geometry } : {}),
           },
           page: {
             url: window.location.href,
@@ -535,6 +688,9 @@ class AnnoteWidget {
       if (!response.ok) return;
       this.annotations = await response.json();
       this.renderMarkers();
+      const focusId = window.location.hash.startsWith("#annote=") ? window.location.hash.slice("#annote=".length) : "";
+      const focused = this.annotations.find((annotation) => annotation.id === focusId);
+      if (focused) window.setTimeout(() => this.focusFeedback(focused), 0);
     } catch {
       // A feedback tool should never interfere with the website it is reviewing.
     }
@@ -547,13 +703,15 @@ class AnnoteWidget {
     count.textContent = String(this.annotations.length);
     count.hidden = this.annotations.length === 0;
     this.renderHighlights();
+    this.renderVisuals();
     this.renderReviewPanel();
     this.annotations.forEach((annotation, index) => {
-      const anchored = annotation.anchor.kind === "text" ? null : document.querySelector(annotation.anchor.selector);
+      const geometry = annotation.anchor.geometry;
+      const anchored = annotation.anchor.kind === "text" || geometry ? null : document.querySelector(annotation.anchor.selector);
       const rect = anchored?.getBoundingClientRect();
       const point = rect
         ? { x: rect.right - 8, y: rect.top - 8 }
-        : { x: annotation.anchor.position.x - window.scrollX, y: annotation.anchor.position.y - window.scrollY };
+        : { x: (geometry?.x ?? annotation.anchor.position.x) - window.scrollX, y: (geometry?.y ?? annotation.anchor.position.y) - window.scrollY };
       const marker = document.createElement("button");
       marker.className = "marker";
       marker.dataset.markerId = annotation.id;
@@ -575,6 +733,51 @@ class AnnoteWidget {
     card.style.left = `${Math.max(16, Math.min(window.innerWidth - railWidth - 316, Math.max(16, rect.left - 258)))}px`;
     card.style.top = `${Math.max(16, rect.top + 32)}px`;
     card.hidden = !card.hidden;
+  }
+
+  private renderVisuals() {
+    const layer = this.element<SVGSVGElement>(".visual-layer");
+    layer.replaceChildren();
+    const geometries = this.annotations.map((annotation) => annotation.anchor.geometry).filter((geometry): geometry is AnnotationGeometry => Boolean(geometry));
+    if (this.draftGeometry) geometries.push(this.draftGeometry);
+    geometries.forEach((geometry) => {
+      const node = this.visualNode(geometry);
+      if (node) layer.append(node);
+    });
+  }
+
+  private visualNode(geometry: AnnotationGeometry) {
+    const create = (name: string) => document.createElementNS("http://www.w3.org/2000/svg", name);
+    if (geometry.type === "freehand") {
+      const points = geometry.points || [];
+      if (points.length < 2) return null;
+      const path = create("polyline");
+      path.setAttribute("class", "visual-ink");
+      path.setAttribute("points", points.map((point) => `${point.x - window.scrollX},${point.y - window.scrollY}`).join(" "));
+      return path;
+    }
+    const width = geometry.width || 0;
+    const height = geometry.height || 0;
+    const x = Math.min(geometry.x, geometry.x + width) - window.scrollX;
+    const y = Math.min(geometry.y, geometry.y + height) - window.scrollY;
+    const absoluteWidth = Math.abs(width);
+    const absoluteHeight = Math.abs(height);
+    if (geometry.type === "circle") {
+      const ellipse = create("ellipse");
+      ellipse.setAttribute("class", "visual-shape");
+      ellipse.setAttribute("cx", String(x + absoluteWidth / 2));
+      ellipse.setAttribute("cy", String(y + absoluteHeight / 2));
+      ellipse.setAttribute("rx", String(absoluteWidth / 2));
+      ellipse.setAttribute("ry", String(absoluteHeight / 2));
+      return ellipse;
+    }
+    const rectangle = create("rect");
+    rectangle.setAttribute("class", "visual-shape");
+    rectangle.setAttribute("x", String(x));
+    rectangle.setAttribute("y", String(y));
+    rectangle.setAttribute("width", String(absoluteWidth));
+    rectangle.setAttribute("height", String(absoluteHeight));
+    return rectangle;
   }
 
   private renderHighlights() {
