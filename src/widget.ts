@@ -155,15 +155,15 @@ class AnnoteWidget {
         .error { color: #b42318; }
         .notice { display: flex; align-items: center; gap: 10px; color: #245c4f; font-size: 13px; font-weight: 700; }
         .notice svg { width: 18px; height: 18px; color: #008f7a; flex: 0 0 auto; }
-        .review-panel { position: fixed; top: 42px; right: 22px; width: min(396px, calc(100vw - 84px)); max-height: calc(100vh - 64px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; overflow: hidden; }
+        .review-panel { position: fixed; right: 84px; bottom: 22px; width: min(396px, calc(100vw - 96px)); height: min(620px, calc(100vh - 44px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; overflow: hidden; animation: annote-panel-in .2s ease-out; }
+        @keyframes annote-panel-in { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: translateX(0); } }
         .review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 17px 16px 13px; border-bottom: 1px solid #e2e8e4; cursor: grab; user-select: none; }
         .review-header:active { cursor: grabbing; }
         .eyebrow { margin: 0 0 5px; color: #008f7a; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
         .review-title { display: flex; align-items: center; gap: 8px; }
         .review-title h2 { font-size: 16px; }
         .panel-count { display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 5px; border-radius: 12px; background: #edf3ef; color: #52625c; font-size: 11px; font-weight: 800; }
-        .tool-dock { position: fixed; top: 120px; right: 432px; display: grid; gap: 4px; width: 50px; padding: 6px; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(23,33,31,.14); pointer-events: auto; transition: top .16s ease, right .16s ease, bottom .16s ease; }
-        .tool-dock.is-collapsed { top: auto; right: 22px; bottom: 22px; transform: none !important; }
+        .tool-dock { position: fixed; right: 22px; bottom: 22px; display: grid; gap: 4px; width: 50px; padding: 6px; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(23,33,31,.14); pointer-events: auto; }
         .tool-divider { height: 1px; margin: 3px 4px; background: #e2e8e4; }
         .tool-button { position: relative; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 5px; background: transparent; color: #53645f; }
         .tool-button:hover { background: #eaf5f0; color: #008f7a; }
@@ -198,7 +198,7 @@ class AnnoteWidget {
         .feedback-empty { margin: 0; padding: 24px 12px; color: #718078; font-size: 12px; line-height: 1.45; }
         .review-footer { display: flex; align-items: center; gap: 7px; padding: 11px 16px; border-top: 1px solid #dce4df; color: #718078; font-size: 11px; line-height: 1.35; }
         .review-footer svg { width: 14px; height: 14px; color: #008f7a; flex: 0 0 auto; }
-        .composer { top: 42px; right: 22px; bottom: auto; width: min(396px, calc(100vw - 32px)); padding: 18px; }
+        .composer { right: 84px; bottom: 22px; width: min(396px, calc(100vw - 96px)); padding: 18px; }
         .visual-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
         .visual-shape { fill: rgba(0, 143, 122, .08); stroke: #008f7a; stroke-width: 3; vector-effect: non-scaling-stroke; }
         .visual-ink { fill: none; stroke: #008f7a; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
@@ -213,7 +213,7 @@ class AnnoteWidget {
         @media (max-width: 560px) {
           .launcher { right: 16px; bottom: 16px; }
           .unlock, .notice { right: 16px; bottom: 74px; }
-          .review-panel, .composer { top: 0; right: 0; width: 100vw; max-height: 100vh; border-radius: 0; }
+          .review-panel, .composer { top: 0; right: 0; bottom: auto; width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
           .tool-dock { display: none; }
           .review-actions { display: grid; }
           .review-header { padding-top: max(20px, env(safe-area-inset-top)); }
@@ -493,13 +493,12 @@ class AnnoteWidget {
     const panel = this.element<HTMLElement>(".review-panel");
     const width = panel.offsetWidth;
     const height = panel.offsetHeight;
-    const baseLeft = window.innerWidth - width - 22;
-    const baseTop = 42;
+    const baseLeft = window.innerWidth - width - 84;
+    const baseTop = window.innerHeight - height - 22;
     const nextLeft = Math.min(window.innerWidth - width - 8, Math.max(8, baseLeft + this.panelDrag.offsetX + event.clientX - this.panelDrag.startX));
     const nextTop = Math.min(window.innerHeight - height - 8, Math.max(8, baseTop + this.panelDrag.offsetY + event.clientY - this.panelDrag.startY));
     this.panelOffset = { x: nextLeft - baseLeft, y: nextTop - baseTop };
     panel.style.transform = `translate(${this.panelOffset.x}px, ${this.panelOffset.y}px)`;
-    this.element<HTMLElement>(".tool-dock").style.transform = `translate(${this.panelOffset.x}px, ${this.panelOffset.y}px)`;
   };
 
   private stopPanelDrag = () => {
@@ -596,8 +595,6 @@ class AnnoteWidget {
     this.element<HTMLElement>(".review-panel").hidden = false;
     const dock = this.element<HTMLElement>(".tool-dock");
     dock.hidden = false;
-    dock.classList.remove("is-collapsed");
-    dock.style.transform = `translate(${this.panelOffset.x}px, ${this.panelOffset.y}px)`;
     this.element<HTMLButtonElement>("[data-action='launcher']").hidden = true;
   }
 
@@ -606,7 +603,6 @@ class AnnoteWidget {
     if (this.token) {
       const dock = this.element<HTMLElement>(".tool-dock");
       dock.hidden = false;
-      dock.classList.add("is-collapsed");
     }
     this.element<HTMLButtonElement>("[data-action='launcher']").hidden = Boolean(this.token);
   }
