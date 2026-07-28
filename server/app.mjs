@@ -106,6 +106,15 @@ export function createApiApp({ store, adminKey }) {
     response.json(safeProject);
   });
 
+  app.post("/api/projects/:projectId/preview-session", requireAdmin, async (request, response) => {
+    const project = await store.findProject(request.params.projectId);
+    if (!project) return response.status(404).json({ error: "Project not found." });
+    const token = crypto.randomUUID();
+    const expiresAt = Date.now() + 1000 * 60 * 60 * 12;
+    await store.createSession(token, { projectId: project.id, expiresAt }, 60 * 60 * 12);
+    response.json({ token, expiresAt: new Date(expiresAt).toISOString() });
+  });
+
   app.post("/api/reviews/:reviewId/unlock", async (request, response) => {
     const project = await store.findProject(request.params.reviewId);
     const origin = request.get("origin");

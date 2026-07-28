@@ -116,6 +116,7 @@ function renderDashboard(project: Project, projects: Project[], annotations: Ann
   bindProjectSettingsDialog(project);
   app.querySelectorAll<HTMLButtonElement>("[data-status]").forEach((button) => button.addEventListener("click", () => updateStatus(button.dataset.id!, button.dataset.status as Annotation["status"])));
   app.querySelectorAll<HTMLButtonElement>("[data-delete]").forEach((button) => button.addEventListener("click", () => deleteAnnotation(button.dataset.delete!)));
+  app.querySelectorAll<HTMLButtonElement>("[data-open-preview]").forEach((button) => button.addEventListener("click", () => openAnnotationPreview(button.dataset.openPreview!, button.dataset.pageUrl!)));
 }
 
 function renderEmptyDashboard() {
@@ -264,7 +265,7 @@ function annotationRow(annotation: Annotation, number: number) {
   return `<article class="feedback-row ${resolved ? "is-resolved" : ""}">
     <div class="feedback-index">${number}</div>
     <div class="feedback-body"><div class="feedback-meta"><span class="element-tag">${escapeHtml(annotation.anchor.label)}</span><span>${date}</span>${resolved ? "<span class=\"resolved-label\">Resolved</span>" : ""}</div><p>${escapeHtml(annotation.comment)}</p><span class="feedback-context"><span>${escapeHtml(annotation.anchor.quote || annotation.anchor.text || "Selected element")}</span><span>Page ${escapeHtml(annotation.page.path || "/")}</span></span></div>
-    <div class="feedback-actions">${pageUrl ? `<a class="icon-action" href="${escapeHtml(pageUrl)}" target="_blank" rel="noreferrer" title="Open annotated page" aria-label="Open annotated page"><i data-lucide="external-link"></i></a>` : ""}${resolved ? `<button class="icon-action" data-id="${annotation.id}" data-status="open" title="Reopen feedback" aria-label="Reopen feedback"><i data-lucide="rotate-ccw"></i></button>` : `<button class="icon-action success" data-id="${annotation.id}" data-status="resolved" title="Resolve feedback" aria-label="Resolve feedback"><i data-lucide="check"></i></button>`}<button class="icon-action danger" data-delete="${annotation.id}" title="Delete feedback" aria-label="Delete feedback"><i data-lucide="trash-2"></i></button></div>
+    <div class="feedback-actions">${pageUrl ? `<button class="icon-action" data-open-preview="${annotation.id}" data-page-url="${escapeHtml(pageUrl)}" title="Open live annotation" aria-label="Open live annotation"><i data-lucide="external-link"></i></button>` : ""}${resolved ? `<button class="icon-action" data-id="${annotation.id}" data-status="open" title="Reopen feedback" aria-label="Reopen feedback"><i data-lucide="rotate-ccw"></i></button>` : `<button class="icon-action success" data-id="${annotation.id}" data-status="resolved" title="Resolve feedback" aria-label="Resolve feedback"><i data-lucide="check"></i></button>`}<button class="icon-action danger" data-delete="${annotation.id}" title="Delete feedback" aria-label="Delete feedback"><i data-lucide="trash-2"></i></button></div>
   </article>`;
 }
 
@@ -302,6 +303,21 @@ async function updateStatus(id: string, status: Annotation["status"]) {
 async function deleteAnnotation(id: string) {
   await request<void>(`/api/annotations/${id}`, { method: "DELETE" });
   await loadDashboard();
+}
+
+async function openAnnotationPreview(annotationId: string, pageUrl: string) {
+  if (!activeProject) return;
+  const preview = window.open("", "_blank");
+  try {
+    const session = await request<{ token: string }>(`/api/projects/${activeProject.id}/preview-session`, { method: "POST" });
+    const destination = new URL(pageUrl);
+    destination.hash = new URLSearchParams({ annote: annotationId, "annote-token": session.token }).toString();
+    if (preview) preview.location.replace(destination.toString());
+    else window.open(destination.toString(), "_blank", "noopener");
+  } catch (caught) {
+    preview?.close();
+    throw caught;
+  }
 }
 
 async function loadDashboard() {

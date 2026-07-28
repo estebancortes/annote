@@ -257,6 +257,7 @@ class AnnoteWidget {
     `;
     this.renderIcons();
     this.bind();
+    this.adoptDashboardPreview();
     if (this.token) {
       void this.loadAnnotations().then(() => this.showReviewPanel());
     }
@@ -265,6 +266,19 @@ class AnnoteWidget {
 
   private sessionKey() {
     return `annote:${this.options.apiBase}:${this.options.reviewId}`;
+  }
+
+  private hashParameter(name: string) {
+    return new URLSearchParams(window.location.hash.slice(1)).get(name) || "";
+  }
+
+  private adoptDashboardPreview() {
+    const token = this.hashParameter("annote-token");
+    if (!token) return;
+    this.token = token;
+    sessionStorage.setItem(this.sessionKey(), token);
+    const annotationId = this.hashParameter("annote");
+    history.replaceState(null, "", `${window.location.pathname}${window.location.search}${annotationId ? `#annote=${encodeURIComponent(annotationId)}` : ""}`);
   }
 
   private renderIcons() {
@@ -722,7 +736,7 @@ class AnnoteWidget {
       if (!response.ok) return;
       this.annotations = await response.json();
       this.renderMarkers();
-      const focusId = window.location.hash.startsWith("#annote=") ? window.location.hash.slice("#annote=".length) : "";
+      const focusId = this.hashParameter("annote");
       const focused = this.annotations.find((annotation) => annotation.id === focusId);
       if (focused) window.setTimeout(() => this.focusFeedback(focused), 0);
     } catch {
@@ -774,6 +788,7 @@ class AnnoteWidget {
     layer.replaceChildren();
     const geometries = this.annotations.map((annotation) => annotation.anchor.geometry).filter((geometry): geometry is AnnotationGeometry => Boolean(geometry));
     if (this.draftGeometry) geometries.push(this.draftGeometry);
+    if (this.selected?.geometry) geometries.push(this.selected.geometry);
     geometries.forEach((geometry) => {
       const node = this.visualNode(geometry);
       if (node) layer.append(node);
