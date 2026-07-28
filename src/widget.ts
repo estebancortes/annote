@@ -281,7 +281,8 @@ class AnnoteWidget {
     window.addEventListener("scroll", () => this.renderMarkers(), { passive: true });
     window.addEventListener("resize", () => this.renderMarkers());
     document.addEventListener("keydown", (event) => {
-      const editable = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || (event.target as HTMLElement | null)?.isContentEditable;
+      const path = event.composedPath();
+      const editable = path.some((node) => node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || (node instanceof HTMLElement && node.isContentEditable));
       if (editable || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "Escape") {
         if (this.picking) this.stopPicking();
