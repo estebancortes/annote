@@ -300,7 +300,6 @@ async function updateStatus(id: string, status: Annotation["status"]) {
 }
 
 async function deleteAnnotation(id: string) {
-  if (!window.confirm("Delete this feedback? This cannot be undone.")) return;
   await request<void>(`/api/annotations/${id}`, { method: "DELETE" });
   await loadDashboard();
 }

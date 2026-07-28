@@ -133,7 +133,7 @@ class AnnoteWidget {
         [data-tooltip]:hover::after { opacity: 1; }
         .outline { position: fixed; display: none; border: 2px solid #008f7a; background: rgba(0,143,122,.08); border-radius: 3px; pointer-events: none; }
         .composer, .unlock, .notice { position: fixed; right: 22px; bottom: 82px; width: min(360px, calc(100vw - 32px)); padding: 18px; border: 1px solid #c7d1ca; border-radius: 7px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; }
-        .composer[hidden], .unlock[hidden], .notice[hidden], .review-panel[hidden] { display: none; }
+        .composer[hidden], .unlock[hidden], .notice[hidden], .review-panel[hidden], .tool-dock[hidden] { display: none; }
         .panel-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
         .icon-button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 4px; background: transparent; color: #53645f; }
@@ -155,37 +155,49 @@ class AnnoteWidget {
         .error { color: #b42318; }
         .notice { display: flex; align-items: center; gap: 10px; color: #245c4f; font-size: 13px; font-weight: 700; }
         .notice svg { width: 18px; height: 18px; color: #008f7a; flex: 0 0 auto; }
-        .review-panel { position: fixed; top: 72px; right: 22px; width: min(378px, calc(100vw - 32px)); max-height: calc(100vh - 94px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border: 1px solid #c7d1ca; border-radius: 7px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; overflow: hidden; }
-        .review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 20px 17px; border-bottom: 1px solid #dce4df; cursor: grab; user-select: none; }
+        .review-panel { position: fixed; top: 42px; right: 22px; width: min(396px, calc(100vw - 84px)); max-height: calc(100vh - 64px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 18px 46px rgba(23,33,31,.18); pointer-events: auto; overflow: hidden; }
+        .review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 17px 16px 13px; border-bottom: 1px solid #e2e8e4; cursor: grab; user-select: none; }
         .review-header:active { cursor: grabbing; }
         .eyebrow { margin: 0 0 5px; color: #008f7a; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
         .review-title { display: flex; align-items: center; gap: 8px; }
-        .review-title h2 { font-size: 17px; }
+        .review-title h2 { font-size: 16px; }
         .panel-count { display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 5px; border-radius: 12px; background: #edf3ef; color: #52625c; font-size: 11px; font-weight: 800; }
-        .review-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 15px 20px; border-bottom: 1px solid #dce4df; }
+        .tool-dock { position: fixed; top: 120px; right: 432px; display: grid; gap: 4px; width: 50px; padding: 6px; border: 1px solid #d8e0db; border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(23,33,31,.14); pointer-events: auto; }
+        .tool-dock::after { content: ""; height: 1px; margin: 3px 4px; background: #e2e8e4; }
+        .tool-button { position: relative; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 5px; background: transparent; color: #53645f; }
+        .tool-button:hover { background: #eaf5f0; color: #008f7a; }
+        .tool-button.primary { background: #008f7a; color: #fff; box-shadow: 0 4px 10px rgba(0,143,122,.22); }
+        .tool-button.primary:hover { background: #007764; color: #fff; }
+        .tool-button svg { width: 18px; height: 18px; }
+        .tool-dock [data-tooltip]::after { right: 44px; }
+        .review-actions { display: none; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #dce4df; }
         .review-action { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #b7c7be; border-radius: 4px; background: #fff; color: #33433e; font-size: 12px; font-weight: 760; }
         .review-action:hover { border-color: #008f7a; color: #006e5e; background: #f4faf7; }
         .review-action.primary { border-color: #008f7a; background: #008f7a; color: #fff; }
         .review-action.primary:hover { background: #007764; color: #fff; }
         .review-action.ink { grid-column: span 2; }
         .review-action svg { width: 15px; height: 15px; }
-        .review-search { padding: 12px 20px; border-bottom: 1px solid #dce4df; }
+        .review-search { padding: 10px 16px; border-bottom: 1px solid #e2e8e4; background: #fff; }
         .review-search input { height: 36px; padding: 0 10px; font-size: 12px; }
-        .feedback-list { display: grid; align-content: start; gap: 1px; min-height: 0; overflow: auto; }
-        .feedback-entry { display: grid; grid-template-columns: 24px minmax(0, 1fr) 28px 28px; gap: 9px; align-items: start; padding: 15px 20px; border-bottom: 1px solid #e2e8e4; }
-        .feedback-entry:last-child { border-bottom: 0; }
+        .feedback-list { display: grid; align-content: start; gap: 9px; min-height: 0; padding: 11px; overflow: auto; background: #f5f8f6; }
+        .feedback-entry { padding: 11px; border: 1px solid #dce5df; border-radius: 7px; background: #fff; box-shadow: 0 1px 2px rgba(23,33,31,.03); }
+        .feedback-entry:hover { border-color: #b7cfc4; }
+        .feedback-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
         .feedback-number { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: #ef6b50; color: #fff; font-size: 11px; font-weight: 800; }
-        .feedback-jump { min-width: 0; padding: 0; border: 0; background: transparent; color: #33433e; text-align: left; font-size: 13px; line-height: 1.35; }
+        .feedback-type { overflow: hidden; color: #52625c; font-size: 11px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+        .feedback-time { margin-left: auto; color: #8a9891; font-size: 10px; white-space: nowrap; }
+        .feedback-jump { width: 100%; min-width: 0; padding: 9px 0 7px; border: 0; background: transparent; color: #263531; text-align: left; font-size: 13px; line-height: 1.4; }
         .feedback-jump:hover { color: #008f7a; }
-        .feedback-context { display: block; overflow: hidden; margin-top: 3px; color: #718078; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+        .feedback-context { display: block; overflow: hidden; color: #718078; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+        .feedback-controls { display: flex; align-items: center; gap: 4px; padding-top: 7px; border-top: 1px solid #edf1ee; }
         .feedback-edit, .feedback-delete { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px; background: transparent; color: #63736c; }
         .feedback-edit:hover { background: #eaf1ed; color: #008f7a; }
         .feedback-delete:hover { background: #fceae7; color: #c33d2c; }
         .feedback-edit svg, .feedback-delete svg { width: 15px; height: 15px; }
-        .feedback-empty { margin: 0; padding: 24px 20px; color: #718078; font-size: 12px; line-height: 1.45; }
-        .review-footer { display: flex; align-items: center; gap: 7px; padding: 13px 20px; border-top: 1px solid #dce4df; color: #718078; font-size: 11px; line-height: 1.35; }
+        .feedback-empty { margin: 0; padding: 24px 12px; color: #718078; font-size: 12px; line-height: 1.45; }
+        .review-footer { display: flex; align-items: center; gap: 7px; padding: 11px 16px; border-top: 1px solid #dce4df; color: #718078; font-size: 11px; line-height: 1.35; }
         .review-footer svg { width: 14px; height: 14px; color: #008f7a; flex: 0 0 auto; }
-        .composer { top: 72px; right: 22px; bottom: auto; width: min(378px, calc(100vw - 32px)); padding: 22px 20px; }
+        .composer { top: 42px; right: 22px; bottom: auto; width: min(396px, calc(100vw - 32px)); padding: 18px; }
         .visual-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; overflow: visible; pointer-events: none; }
         .visual-shape { fill: rgba(0, 143, 122, .08); stroke: #008f7a; stroke-width: 3; vector-effect: non-scaling-stroke; }
         .visual-ink { fill: none; stroke: #008f7a; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
@@ -201,6 +213,8 @@ class AnnoteWidget {
           .launcher { right: 16px; bottom: 16px; }
           .unlock, .notice { right: 16px; bottom: 74px; }
           .review-panel, .composer { top: 0; right: 0; width: 100vw; max-height: 100vh; border-radius: 0; }
+          .tool-dock { display: none; }
+          .review-actions { display: grid; }
           .review-header { padding-top: max(20px, env(safe-area-inset-top)); }
         }
       </style>
@@ -218,6 +232,13 @@ class AnnoteWidget {
           <div class="target"></div>
           <form data-form="comment"><label for="annote-comment">What should change?</label><textarea id="annote-comment" name="comment" maxlength="1200" required placeholder="Describe the feedback clearly..."></textarea><p class="error" hidden></p><div class="actions"><button class="text-button" type="button" data-action="cancel-comment">Cancel</button><button class="primary" type="submit"><i data-lucide="send"></i>Send</button></div></form>
         </section>
+        <aside class="tool-dock" hidden aria-label="Annotation tools">
+          <button class="tool-button primary" data-action="add-point" data-tooltip="Pin note" aria-label="Pin note"><i data-lucide="mouse-pointer-2"></i></button>
+          <button class="tool-button" data-action="highlight" data-tooltip="Highlight text" aria-label="Highlight text"><i data-lucide="highlighter"></i></button>
+          <button class="tool-button" data-action="rectangle" data-tooltip="Rectangle" aria-label="Rectangle"><i data-lucide="square"></i></button>
+          <button class="tool-button" data-action="circle" data-tooltip="Circle" aria-label="Circle"><i data-lucide="circle"></i></button>
+          <button class="tool-button" data-action="freehand" data-tooltip="Freehand" aria-label="Freehand"><i data-lucide="pen-tool"></i></button>
+        </aside>
         <section class="review-panel" hidden aria-label="Your feedback">
           <header class="review-header"><div><p class="eyebrow">Client review</p><div class="review-title"><h2>Feedback</h2><span class="panel-count">0</span></div></div><button class="icon-button" data-action="close-review" aria-label="Close feedback panel" title="Close"><i data-lucide="x"></i></button></header>
           <div class="review-actions"><button class="review-action primary" data-action="add-point"><i data-lucide="mouse-pointer-2"></i>Pin note</button><button class="review-action" data-action="highlight"><i data-lucide="highlighter"></i>Highlight</button><button class="review-action" data-action="rectangle"><i data-lucide="square"></i>Rectangle</button><button class="review-action" data-action="circle"><i data-lucide="circle"></i>Circle</button><button class="review-action ink" data-action="freehand"><i data-lucide="pen-tool"></i>Freehand</button></div>
@@ -263,11 +284,11 @@ class AnnoteWidget {
       if (this.token) this.toggleReviewPanel();
       else this.showUnlock();
     });
-    this.element<HTMLButtonElement>("[data-action='add-point']").addEventListener("click", () => this.startPicking());
-    this.element<HTMLButtonElement>("[data-action='highlight']").addEventListener("click", () => this.startTextSelecting());
-    this.element<HTMLButtonElement>("[data-action='rectangle']").addEventListener("click", () => this.startDrawing("rectangle"));
-    this.element<HTMLButtonElement>("[data-action='circle']").addEventListener("click", () => this.startDrawing("circle"));
-    this.element<HTMLButtonElement>("[data-action='freehand']").addEventListener("click", () => this.startDrawing("freehand"));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='add-point']").forEach((button) => button.addEventListener("click", () => this.startPicking()));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='highlight']").forEach((button) => button.addEventListener("click", () => this.startTextSelecting()));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='rectangle']").forEach((button) => button.addEventListener("click", () => this.startDrawing("rectangle")));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='circle']").forEach((button) => button.addEventListener("click", () => this.startDrawing("circle")));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-action='freehand']").forEach((button) => button.addEventListener("click", () => this.startDrawing("freehand")));
     this.element<HTMLButtonElement>("[data-action='close-review']").addEventListener("click", () => this.hideReviewPanel());
     this.element<HTMLElement>(".review-header").addEventListener("pointerdown", (event) => this.startPanelDrag(event));
     this.element<HTMLInputElement>("[data-review-search]").addEventListener("input", (event) => {
@@ -469,11 +490,12 @@ class AnnoteWidget {
     const width = panel.offsetWidth;
     const height = panel.offsetHeight;
     const baseLeft = window.innerWidth - width - 22;
-    const baseTop = 72;
+    const baseTop = 42;
     const nextLeft = Math.min(window.innerWidth - width - 8, Math.max(8, baseLeft + this.panelDrag.offsetX + event.clientX - this.panelDrag.startX));
     const nextTop = Math.min(window.innerHeight - height - 8, Math.max(8, baseTop + this.panelDrag.offsetY + event.clientY - this.panelDrag.startY));
     this.panelOffset = { x: nextLeft - baseLeft, y: nextTop - baseTop };
     panel.style.transform = `translate(${this.panelOffset.x}px, ${this.panelOffset.y}px)`;
+    this.element<HTMLElement>(".tool-dock").style.transform = `translate(${this.panelOffset.x}px, ${this.panelOffset.y}px)`;
   };
 
   private stopPanelDrag = () => {
@@ -567,11 +589,13 @@ class AnnoteWidget {
     if (!this.token) return;
     this.renderReviewPanel();
     this.element<HTMLElement>(".review-panel").hidden = false;
+    this.element<HTMLElement>(".tool-dock").hidden = false;
     this.element<HTMLButtonElement>("[data-action='launcher']").hidden = true;
   }
 
   private hideReviewPanel() {
     this.element<HTMLElement>(".review-panel").hidden = true;
+    this.element<HTMLElement>(".tool-dock").hidden = true;
     this.element<HTMLButtonElement>("[data-action='launcher']").hidden = false;
   }
 
@@ -589,7 +613,9 @@ class AnnoteWidget {
     list.innerHTML = visible.length
       ? visible.map((annotation) => {
         const index = this.annotations.indexOf(annotation) + 1;
-        return `<article class="feedback-entry"><span class="feedback-number">${index}</span><button class="feedback-jump" data-action="jump-feedback" data-id="${annotation.id}"><span>${this.escapeHtml(annotation.comment)}</span><span class="feedback-context">${this.escapeHtml(annotation.anchor.kind === "text" ? annotation.anchor.quote || annotation.anchor.text : annotation.anchor.label)}</span></button><button class="feedback-edit" data-action="edit-feedback" data-id="${annotation.id}" aria-label="Edit feedback ${index}" title="Edit feedback"><i data-lucide="pencil"></i></button><button class="feedback-delete" data-action="delete-feedback" data-id="${annotation.id}" aria-label="Delete feedback ${index}" title="Delete feedback"><i data-lucide="trash-2"></i></button></article>`;
+        const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(annotation.createdAt));
+        const context = annotation.anchor.kind === "text" ? annotation.anchor.quote || annotation.anchor.text : annotation.anchor.label;
+        return `<article class="feedback-entry"><div class="feedback-head"><span class="feedback-number">${index}</span><span class="feedback-type">${this.escapeHtml(annotation.anchor.label)}</span><span class="feedback-time">${time}</span></div><button class="feedback-jump" data-action="jump-feedback" data-id="${annotation.id}"><span>${this.escapeHtml(annotation.comment)}</span><span class="feedback-context">${this.escapeHtml(context)}</span></button><div class="feedback-controls"><button class="feedback-edit" data-action="edit-feedback" data-id="${annotation.id}" aria-label="Edit feedback ${index}" title="Edit feedback"><i data-lucide="pencil"></i></button><button class="feedback-delete" data-action="delete-feedback" data-id="${annotation.id}" aria-label="Delete feedback ${index}" title="Delete feedback"><i data-lucide="trash-2"></i></button></div></article>`;
       }).join("")
       : `<p class="feedback-empty">${this.reviewQuery ? "No feedback matches that search." : "Add a point, a visual mark, or a text highlight to begin your review."}</p>`;
     this.renderIcons();
@@ -620,7 +646,6 @@ class AnnoteWidget {
   }
 
   private async deleteFeedback(annotation: Annotation) {
-    if (!window.confirm("Delete this feedback? This cannot be undone.")) return;
     try {
       const response = await fetch(apiUrl(this.options.apiBase, `/api/reviews/${this.options.reviewId}/annotations/${annotation.id}`), {
         method: "DELETE",
