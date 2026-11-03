@@ -50,12 +50,12 @@
     el.style.whiteSpace = 'nowrap';
     var lock = function () { el.style.width = ''; el.style.width = Math.ceil(el.getBoundingClientRect().width) + 'px'; };
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(lock); else lock();
-    el.addEventListener('mouseenter', function () { scramble(el, text, 700); });
-    el.addEventListener('focus', function () { scramble(el, text, 700); });
+    el.addEventListener('mouseenter', function () { scramble(el, text, 800); });
+    el.addEventListener('focus', function () { scramble(el, text, 800); });
     if ('IntersectionObserver' in window) {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
-          if (en.isIntersecting) { scramble(el, text, 700); io.disconnect(); }
+          if (en.isIntersecting) { scramble(el, text, 800); io.disconnect(); }
         });
       }, { threshold: 0.6 });
       io.observe(el);
