@@ -101,7 +101,7 @@ app.innerHTML = `
     </section>
   </main>
 
-  <footer class="site-footer content-width"><a class="wordmark" href="#top"><span class="wordmark-mark"><i data-lucide="message-square"></i></span><span>Annote</span></a><p>Made for clearer website reviews.</p><a href="https://www.corteslabs.xyz/?utm_source=annote&amp;utm_medium=footer_credit" target="_blank" rel="noopener" data-corteslabs-credit>Made by CORTÉSLabs</a><a href="https://github.com/estebancortes/annote" target="_blank" rel="noreferrer">GitHub</a></footer>
+  <footer class="site-footer content-width"><a class="wordmark" href="#top"><span class="wordmark-mark"><i data-lucide="message-square"></i></span><span>Annote</span></a><p>Made for clearer website reviews.</p><a href="https://github.com/estebancortes/annote" target="_blank" rel="noreferrer">GitHub</a><a href="https://www.corteslabs.xyz/?utm_source=annote&amp;utm_medium=footer_credit" target="_blank" rel="noopener" data-corteslabs-credit>Made by CORTÉSLabs</a></footer>
 `;
 
 createIcons({
