@@ -13,14 +13,19 @@
     if (el._ccBusy) return;
     el._ccBusy = true;
     var start = performance.now();
-    var queue = [];
+    var queue = [], last = 0, out = text;
     for (var i = 0; i < text.length; i++) {
       var t0 = Math.random() * 0.4;
       queue.push({ to: text[i], t0: t0, t1: t0 + 0.3 + Math.random() * 0.3 });
     }
     function frame(now) {
       var p = Math.min((now - start) / duration, 1);
-      var out = '', done = 0;
+      // new random characters about every 55 ms, not every frame, so it
+      // reads as a calm decode rather than a flicker
+      if (now - last < 55 && p < 1) { requestAnimationFrame(frame); return; }
+      last = now;
+      out = '';
+      var done = 0;
       for (var k = 0; k < queue.length; k++) {
         var q = queue[k];
         if (q.to === ' ') { out += ' '; done++; }
@@ -45,12 +50,12 @@
     el.style.whiteSpace = 'nowrap';
     var lock = function () { el.style.width = ''; el.style.width = Math.ceil(el.getBoundingClientRect().width) + 'px'; };
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(lock); else lock();
-    el.addEventListener('mouseenter', function () { scramble(el, text, 600); });
-    el.addEventListener('focus', function () { scramble(el, text, 600); });
+    el.addEventListener('mouseenter', function () { scramble(el, text, 1100); });
+    el.addEventListener('focus', function () { scramble(el, text, 1100); });
     if ('IntersectionObserver' in window) {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
-          if (en.isIntersecting) { scramble(el, text, 1100); io.disconnect(); }
+          if (en.isIntersecting) { scramble(el, text, 1800); io.disconnect(); }
         });
       }, { threshold: 0.6 });
       io.observe(el);
